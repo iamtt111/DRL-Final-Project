@@ -127,7 +127,9 @@ def generate_all_plots(results_json_path: str = "docs/benchmark_results.json") -
         print(f"Saved: {radar_path}")
 
     # 4. 新增：繪製乘客等待時間的累積分布函數 (CDF) 曲線 (1x3 Subplots)
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    fig, axes = plt.subplots(1, len(scenarios), figsize=(6 * len(scenarios), 5))
+    if len(scenarios) == 1:
+        axes = [axes]
     for i, sc in enumerate(scenarios):
         ax = axes[i]
         sc_data = scenarios_data[sc]
@@ -157,8 +159,10 @@ def generate_all_plots(results_json_path: str = "docs/benchmark_results.json") -
     plt.close()
     print(f"Saved: {cdf_path}")
 
-    # 5. 新增：繪製不同優先權乘客等待時間的箱線圖 (1x3 Subplots)
-    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+    # 5. 新增：繪製不同優先權乘客等待時間的箱線圖 (橫軸為優先權，縱軸為等待時間)
+    fig, axes = plt.subplots(1, len(scenarios), figsize=(6 * len(scenarios), 6))
+    if len(scenarios) == 1:
+        axes = [axes]
     priority_map = {
         0: "Normal (L0)",
         1: "Priority (L1)",
@@ -236,8 +240,10 @@ def generate_all_plots(results_json_path: str = "docs/benchmark_results.json") -
     plt.close()
     print(f"Saved: {sc_boxplot_path}")
 
-    # 7. 增強：繪製 NSS vs AWT Pareto 能效折衷散點圖 (1x3 Subplots)
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5.5))
+    # 7. 增強：繪製 NSS vs AWT Pareto 能效折衷散點圖
+    fig, axes = plt.subplots(1, len(scenarios), figsize=(6 * len(scenarios), 5.5))
+    if len(scenarios) == 1:
+        axes = [axes]
     markers = {"MaskablePPO": "o", "SARSA(λ)": "^", "Nearest Car": "s", "MAPPO": "*"}
     colors = {"MaskablePPO": "#2b5c8f", "SARSA(λ)": "#2ca02c", "Nearest Car": "#ff7f0e", "MAPPO": "#d62728"}
     

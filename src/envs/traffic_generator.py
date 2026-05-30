@@ -80,7 +80,8 @@ class HospitalTrafficGenerator:
         })
 
         # 優先事件發生率 (每秒發生率)
-        priority_config = config.get("priority_events", {})
+        traffic_config = config.get("traffic", {})
+        priority_config = traffic_config.get("priority_events", config.get("priority_events", {}))
         self.emergency_rate = priority_config.get("emergency_rate", 0.005)   # Level 3 急診
         self.staff_rate = priority_config.get("staff_rate", 0.01)           # Level 2 醫護
         self.wheelchair_rate = priority_config.get("wheelchair_rate", 0.015) # Level 1 輪椅

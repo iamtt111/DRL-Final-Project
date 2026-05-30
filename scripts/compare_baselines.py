@@ -19,7 +19,7 @@ def main():
     config = load_config(args.config)
     env = HospitalElevatorEnv(config=config)
 
-    scenarios = ["morning_peak", "evening_peak", "mixed_traffic"]
+    scenarios = ["morning_peak", "evening_peak", "mixed_traffic", "disaster_crisis"]
     
     # 定義模型路徑
     ppo_model_path = "models/ppo/best_model.zip"

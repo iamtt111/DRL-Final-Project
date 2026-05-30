@@ -10,7 +10,7 @@ mappo:
   n_epochs: 10
   batch_size: 64
   buffer_capacity: 2048
-  total_timesteps: 150000
+  total_timesteps: 1000000
   eval_freq: 10000
   n_eval_episodes: 10
 

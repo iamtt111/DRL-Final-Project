@@ -153,11 +153,16 @@ class Building:
                     p.arrive_time = self.current_time
                     elev.passengers.remove(p)
                     
-                    # 乘客下車時間延遲
-                    delay = elev.boarding_time_per_person
-                    if p.priority_level == 1:  # 輪椅族延遲開門
-                        delay += elev.door_extension_wheelchair
-                    elev.door_timer = min(elev.door_timer + delay, 10.0)
+                    # 乘客下車時間延遲 (Hospital Semantics)
+                    if p.priority_level == 3:       # 急診病床
+                        delay = 5.0
+                    elif p.priority_level == 2:     # 醫護 / VIP
+                        delay = 2.5
+                    elif p.priority_level == 1:     # 輪椅族
+                        delay = elev.boarding_time_per_person + elev.door_extension_wheelchair
+                    else:                           # 一般乘客
+                        delay = elev.boarding_time_per_person
+                    elev.door_timer = min(elev.door_timer + delay, 15.0)
 
                     all_events.append(Event(EventType.PASSENGER_DELIVERED, self.current_time, {
                         "passenger_id": p.id,
@@ -202,11 +207,16 @@ class Building:
                         if is_emergency_boarding:
                             elev.emergency_target = p.destination_floor
 
-                        # 乘客上車時間延遲
-                        delay = elev.boarding_time_per_person
-                        if p.priority_level == 1:
-                            delay += elev.door_extension_wheelchair
-                        elev.door_timer = min(elev.door_timer + delay, 10.0)
+                        # 乘客上車時間延遲 (Hospital Semantics)
+                        if p.priority_level == 3:       # 急診病床
+                            delay = 5.0
+                        elif p.priority_level == 2:     # 醫護 / VIP
+                            delay = 2.5
+                        elif p.priority_level == 1:     # 輪椅族
+                            delay = elev.boarding_time_per_person + elev.door_extension_wheelchair
+                        else:                           # 一般乘客
+                            delay = elev.boarding_time_per_person
+                        elev.door_timer = min(elev.door_timer + delay, 15.0)
 
                         # 將目的地加入電梯的停靠站中
                         if p.destination_floor not in elev.pending_stops:

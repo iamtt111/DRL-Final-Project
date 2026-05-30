@@ -17,3 +17,10 @@ The traffic generator SHALL inject high-priority events (Emergency Bed, Medical 
 - **WHEN** an emergency event triggers
 - **THEN** a Level 3 priority passenger is created and added to the building
 
+### Requirement: Scenario Driven Priority Rates
+The traffic generator SHALL override default priority event rates with scenario-specific priority configuration rates when loading a scenario.
+
+#### Scenario: Extreme disaster priority rate override
+- **WHEN** loading the disaster crisis scenario
+- **THEN** the emergency arrival rate is overridden and set to 0.03 events per second
+
