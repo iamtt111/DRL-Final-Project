@@ -1,0 +1,17 @@
+building:
+  num_floors: 16           # 樓層數（參考論文：16 層）
+  floor_height_lobby: 4.0  # 大廳樓層高度 (m)
+  floor_height_normal: 3.0 # 一般樓層高度 (m)
+
+elevator:
+  num_elevators: 4         # 電梯數量（參考論文：4 台）
+  max_capacity: 12         # 額定容量 (人)
+  rated_speed: 2.5         # 額定速度 (m/s)
+  acceleration: 1.0        # 加速度 (m/s²)
+  door_open_time: 1.0      # 開門時間 (s)
+  door_close_time: 1.0     # 關門時間 (s)
+  boarding_time_per_person: 1.5  # 每人進出時間 (s)
+
+priority:
+  door_extension_wheelchair: 3.0  # 輪椅族延長開門 (s)
+  emergency_timeout_penalty: 10.0 # 急診超時懲罰基數

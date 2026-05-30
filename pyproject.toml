@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "elevator_egcs"
+version = "1.0.0"
+description = "Smart Hospital Elevator Group Control & Priority Dispatching System (EGCS) based on DRL"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "gymnasium>=0.29.0",
+    "numpy>=1.24.0",
+    "stable-baselines3>=2.0.0",
+    "sb3-contrib>=2.0.0",
+    "pygame>=2.5.0",
+    "pyyaml",
+    "pandas",
+    "matplotlib",
+    "seaborn"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]

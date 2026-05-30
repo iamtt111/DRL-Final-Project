@@ -1,0 +1,20 @@
+ppo:
+  learning_rate: 0.0003        # 學習率
+  n_steps: 2048                # 每次更新前收集的步數
+  batch_size: 64               # Mini-batch 大小
+  n_epochs: 10                 # 每次更新的 epoch 數
+  gamma: 0.99                  # 折扣因子
+  gae_lambda: 0.95             # GAE λ 參數
+  clip_range: 0.2              # PPO clipping 範圍
+  clip_range_vf: null          # Value function clipping (不啟用)
+  ent_coef: 0.01               # 熵正則化係數（鼓勵探索）
+  vf_coef: 0.5                 # Value loss 權重
+  max_grad_norm: 0.5           # 梯度裁剪
+  policy_kwargs:
+    net_arch:
+      pi: [256, 256, 128]      # Policy 網路層
+      vf: [256, 256, 128]      # Value 網路層
+    activation_fn: "ReLU"
+  total_timesteps: 1000000     # 總訓練步數
+  eval_freq: 10000             # 評估頻率
+  n_eval_episodes: 20          # 每次評估的 episode 數

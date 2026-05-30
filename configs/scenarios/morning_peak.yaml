@@ -1,0 +1,8 @@
+duration_minutes: 10
+total_passengers: 170
+flow_distribution:
+  incoming: 0.74    # 74% 從大廳進入 → 上行
+  outgoing: 0.11    # 11% 從各樓層 → 大廳離開
+  interfloor: 0.15  # 15% 樓層間移動
+arrival_pattern: "poisson"
+peak_multiplier: 1.0

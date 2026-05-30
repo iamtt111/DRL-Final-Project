@@ -1,0 +1,8 @@
+duration_minutes: 10
+total_passengers: 100
+flow_distribution:
+  incoming: 0.35
+  outgoing: 0.35
+  interfloor: 0.30
+arrival_pattern: "poisson"
+peak_multiplier: 0.6
