@@ -50,6 +50,7 @@ class HospitalElevatorMAEnv:
             low=-2.0, high=2.0, shape=(self.local_obs_dim,), dtype=np.float32
         )
         self.action_space = spaces.Discrete(4)
+        self.previous_actions = {i: 0 for i in range(self.num_elevators)}
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None) -> Tuple[Dict[int, np.ndarray], Dict[int, Any]]:
         """重置環境"""
@@ -61,6 +62,7 @@ class HospitalElevatorMAEnv:
         self.building.reset(self.rng)
         self.traffic_gen.reset(self.rng)
         self.pending_assignments.clear()
+        self.previous_actions = {i: 0 for i in range(self.num_elevators)}
 
         # 生成 t=0 時的第一批乘客
         new_passengers = self.traffic_gen.generate_arrivals(0.0, self.dt)
@@ -257,7 +259,15 @@ class HospitalElevatorMAEnv:
                 else:
                     waiting_penalty += -0.03
 
-        step_reward = total_invalid_penalty + energy_penalty + event_rewards + waiting_penalty
+        # Action transition penalty (NSS reduction)
+        transition_penalty = 0.0
+        for idx in range(self.num_elevators):
+            prev_act = self.previous_actions.get(idx, 0)
+            curr_act = actions_dict[idx]
+            if prev_act in [1, 2] and curr_act != prev_act:
+                transition_penalty += -0.5
+
+        step_reward = total_invalid_penalty + energy_penalty + event_rewards + waiting_penalty + transition_penalty
         rewards = {i: step_reward for i in range(self.num_elevators)}
 
         # 6. 生成下一觀察值與 info
@@ -269,7 +279,8 @@ class HospitalElevatorMAEnv:
             "invalid_action_penalty": total_invalid_penalty,
             "energy_penalty": energy_penalty,
             "event_rewards": event_rewards,
-            "waiting_penalty": waiting_penalty
+            "waiting_penalty": waiting_penalty,
+            "action_transition_penalty": transition_penalty
         }
         
         info = {
@@ -278,6 +289,9 @@ class HospitalElevatorMAEnv:
             "reward_components": components
         }
         infos = {i: info for i in range(self.num_elevators)}
+
+        # 更新前一個 action 狀態
+        self.previous_actions = actions_dict
 
         if self.render_mode == "human":
             self.render()

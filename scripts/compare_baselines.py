@@ -2,6 +2,7 @@ import argparse
 import numpy as np
 import json
 import os
+import datetime
 from src.envs.elevator_env import HospitalElevatorEnv
 from src.agents.sarsa_agent import SarsaAgent
 from src.agents.rule_based import NearestCarAgent
@@ -104,12 +105,96 @@ def main():
     print("\nBenchmark results and statistical reports saved to docs/benchmark_results.json")
 
     # 呼叫圖表自動生成 (Phase 4.3)
+    plot_paths = {}
     try:
         from src.visualization.charts import generate_all_plots
         print("\nGenerating evaluation charts...")
-        generate_all_plots("docs/benchmark_results.json")
+        plot_paths = generate_all_plots("docs/benchmark_results.json")
     except Exception as e:
         print(f"Failed to generate charts: {e}")
+
+    # Generate Markdown Tables
+    markdown_tables = []
+    for scenario in scenarios:
+        sc_data = results.get(scenario, {})
+        
+        # Build Table
+        table = []
+        table.append(f"### Scenario: {scenario.replace('_', ' ').title()}")
+        table.append("| Metric | MAPPO | SARSA(λ) | Nearest Car |")
+        table.append("| :--- | :---: | :---: | :---: |")
+        
+        metrics_keys = [
+            ("AWT (s)", "awt", ".2f"),
+            ("ERT (s)", "ert", ".2f"),
+            ("ECR (%)", "ecr", ".2f"),
+            ("NSS (times)", "nss", ".2f")
+        ]
+        
+        for label, key, fmt in metrics_keys:
+            mappo_val = f"{sc_data.get('MAPPO', {}).get(key, 0.0):{fmt}}" if 'MAPPO' in sc_data else "N/A"
+            sarsa_val = f"{sc_data.get('SARSA(λ)', {}).get(key, 0.0):{fmt}}" if 'SARSA(λ)' in sc_data else "N/A"
+            nearest_val = f"{sc_data.get('Nearest Car', {}).get(key, 0.0):{fmt}}" if 'Nearest Car' in sc_data else "N/A"
+            table.append(f"| {label} | {mappo_val} | {sarsa_val} | {nearest_val} |")
+            
+        table_str = "\n".join(table)
+        markdown_tables.append(table_str)
+        
+    print("\n================ BENCHMARK METRICS SUMMARY TABLES ================")
+    for table_str in markdown_tables:
+        print(table_str)
+        print()
+        
+    # Generate/Update docs/evaluation_report.md
+    report_content = []
+    report_content.append("# Scientific Evaluation Report")
+    report_content.append(f"*Generated on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+    report_content.append("\n## Executive Summary")
+    report_content.append("This report outlines the scientific evaluation and comparative benchmarking of the Multi-Agent PPO (MAPPO), SARSA(λ), and Nearest Car elevator control algorithms across multiple traffic distribution scenarios.")
+    
+    report_content.append("\n## Scenario Metrics Comparison")
+    for table_str in markdown_tables:
+        report_content.append(table_str)
+        report_content.append("")
+        
+    report_content.append("## Visualizations")
+    
+    if plot_paths:
+        if "awt" in plot_paths:
+            report_content.append("### 1. Normal vs. Emergency Waiting Time")
+            rel_path = plot_paths["awt"].replace("docs/", "")
+            report_content.append(f"![Normal vs. Emergency WT]({rel_path})")
+            report_content.append("")
+            
+        if "radar" in plot_paths:
+            report_content.append("### 2. Multi-Objective Performance Radar")
+            rel_path = plot_paths["radar"].replace("docs/", "")
+            report_content.append(f"![Radar Plot]({rel_path})")
+            report_content.append("")
+            
+        if "tradeoff" in plot_paths:
+            report_content.append("### 3. Medical AWT vs. ERT Trade-off")
+            rel_path = plot_paths["tradeoff"].replace("docs/", "")
+            report_content.append(f"![Tradeoff Plot]({rel_path})")
+            report_content.append("")
+            
+        if "boxplot" in plot_paths:
+            report_content.append("### 4. Waiting Time Distribution by Passenger Priority")
+            rel_path = plot_paths["boxplot"].replace("docs/", "")
+            report_content.append(f"![Priority Boxplot]({rel_path})")
+            report_content.append("")
+            
+        if "training" in plot_paths:
+            report_content.append("### 5. MAPPO Training Convergence")
+            rel_path = plot_paths["training"].replace("docs/", "")
+            report_content.append(f"![Training Convergence]({rel_path})")
+            report_content.append("")
+    else:
+        report_content.append("*Warning: No evaluation charts generated.*")
+        
+    with open("docs/evaluation_report.md", "w", encoding="utf-8") as f:
+        f.write("\n".join(report_content))
+    print("Evaluation report saved to docs/evaluation_report.md")
 
 if __name__ == "__main__":
     main()

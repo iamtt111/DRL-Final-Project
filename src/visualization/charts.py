@@ -30,11 +30,11 @@ def draw_bracket(ax, x1, x2, y, h, text):
     ax.plot([x1, x1, x2, x2], [y - h, y, y, y - h], color="black", lw=1.0)
     ax.text((x1 + x2)/2, y + h * 0.2, text, ha="center", va="bottom", fontsize=9, fontweight="bold")
 
-def generate_all_plots(results_json_path: str = "docs/benchmark_results.json") -> None:
+def generate_all_plots(results_json_path: str = "docs/benchmark_results.json") -> dict:
     """載入基準測試數據，並繪製 AWT 分組條形圖 (附 t-test 顯著性檢定)、優先權箱線圖、Pareto 醫療權衡散點圖、多目標雷達圖及 MAPPO 訓練收斂曲線。"""
     if not os.path.exists(results_json_path):
         print(f"Error: {results_json_path} does not exist.")
-        return
+        return {}
 
     with open(results_json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -48,6 +48,9 @@ def generate_all_plots(results_json_path: str = "docs/benchmark_results.json") -
     # 確保輸出目錄存在
     save_dir = "docs/images"
     os.makedirs(save_dir, exist_ok=True)
+
+    import datetime
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # 設置繪圖樣式與繁中/英文相容字型
     sns.set_theme(style="whitegrid")
@@ -167,7 +170,7 @@ def generate_all_plots(results_json_path: str = "docs/benchmark_results.json") -
             
     plt.suptitle("Normal Passenger WT vs. Emergency L3 WT Comparison (with t-test annotations)", fontsize=14, fontweight="bold", y=0.98)
     plt.tight_layout()
-    fig_path = os.path.join(save_dir, "comparison_awt.png")
+    fig_path = os.path.join(save_dir, f"comparison_awt_{timestamp}.png")
     plt.savefig(fig_path, dpi=300)
     plt.close()
     print(f"Saved: {fig_path}")
@@ -188,7 +191,7 @@ def generate_all_plots(results_json_path: str = "docs/benchmark_results.json") -
     ax.set_title("MAPPO Training Convergence Curve", fontsize=14, fontweight="bold")
     ax.legend(fontsize=10)
     plt.tight_layout()
-    train_curve_path = os.path.join(save_dir, "training_convergence.png")
+    train_curve_path = os.path.join(save_dir, f"training_convergence_{timestamp}.png")
     plt.savefig(train_curve_path, dpi=300)
     plt.close()
     print(f"Saved: {train_curve_path}")
@@ -244,7 +247,7 @@ def generate_all_plots(results_json_path: str = "docs/benchmark_results.json") -
         ax.set_title(f"Multi-Objective Performance Radar ({target_scenario.replace('_',' ').title()})", fontsize=14, fontweight="bold", y=1.1)
         ax.legend(loc="upper right", bbox_to_anchor=(1.2, 1.1), fontsize=10)
         plt.tight_layout()
-        radar_path = os.path.join(save_dir, "comparison_radar.png")
+        radar_path = os.path.join(save_dir, f"comparison_radar_{timestamp}.png")
         plt.savefig(radar_path, dpi=300)
         plt.close()
         print(f"Saved: {radar_path}")
@@ -293,7 +296,7 @@ def generate_all_plots(results_json_path: str = "docs/benchmark_results.json") -
         ax.grid(True, linestyle="--", alpha=0.6)
         
     plt.tight_layout()
-    boxplot_path = os.path.join(save_dir, "comparison_priority_boxplot.png")
+    boxplot_path = os.path.join(save_dir, f"comparison_priority_boxplot_{timestamp}.png")
     plt.savefig(boxplot_path, dpi=300)
     plt.close()
     print(f"Saved: {boxplot_path}")
@@ -364,9 +367,16 @@ def generate_all_plots(results_json_path: str = "docs/benchmark_results.json") -
             
     plt.suptitle("Medical Trade-off: Overall AWT vs. Emergency Response Time (ERT)", fontsize=14, fontweight="bold", y=0.98)
     plt.tight_layout()
-    scatter_path = os.path.join(save_dir, "comparison_tradeoff.png")
+    scatter_path = os.path.join(save_dir, f"comparison_tradeoff_{timestamp}.png")
     plt.savefig(scatter_path, dpi=300)
     plt.close()
     print(f"Saved: {scatter_path}")
 
     print(f"All plots have been successfully generated under {save_dir}/")
+    return {
+        "awt": f"docs/images/comparison_awt_{timestamp}.png",
+        "training": f"docs/images/training_convergence_{timestamp}.png",
+        "radar": f"docs/images/comparison_radar_{timestamp}.png",
+        "boxplot": f"docs/images/comparison_priority_boxplot_{timestamp}.png",
+        "tradeoff": f"docs/images/comparison_tradeoff_{timestamp}.png",
+    }

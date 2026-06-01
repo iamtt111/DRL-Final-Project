@@ -1,15 +1,4 @@
-# baseline-comparison Specification
-
-## Purpose
-TBD - created by archiving change add-phase4-evaluation-demo. Update Purpose after archive.
-## Requirements
-### Requirement: Benchmarking Multiple Algorithms
-The comparison engine SHALL benchmark MaskablePPO, SARSA(λ), and Nearest Car over a configured number of episodes (default 100) per scenario, tracking AWT, PWT, ERT, ECR, ENI, and LBI.
-
-#### Scenario: Collect comparative KPIs
-- **WHEN** benchmark is run
-- **THEN** it generates raw metrics files for all three algorithms under each traffic scenario
-
+## ADDED Requirements
 ### Requirement: Console Markdown Table Output
 The comparison engine SHALL print a Markdown table summarizing the core metrics (AWT, ERT, ECR, NSS) for all traffic scenarios side-by-side for MAPPO, SARSA(λ), and Nearest Car to the console.
 
@@ -23,4 +12,3 @@ The comparison engine SHALL automatically generate or update a Markdown dashboar
 #### Scenario: Generate report after benchmarking
 - **WHEN** benchmarking completes and charts are generated
 - **THEN** it saves `docs/evaluation_report.md` with the embedded images and tables
-
