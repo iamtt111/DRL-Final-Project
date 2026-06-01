@@ -10,12 +10,12 @@ mappo:
   n_epochs: 10
   batch_size: 64
   buffer_capacity: 2048
-  total_timesteps: 1000000
+  total_timesteps: 1500000
   eval_freq: 10000
   n_eval_episodes: 10
 
 reward:
   weights:
-    wait: 0.5
+    wait: 0.55
     energy: 0.05
-    emergency: 0.45
+    emergency: 0.40

@@ -30,11 +30,6 @@ class NearestCarAgent:
             # 若無待指派呼叫，預設指派給電梯 0
             return 0, None
 
-        # 2. 獲取可用動作遮罩
-        mask = np.ones(self.env.num_elevators, dtype=bool) if self.env is not None else None
-        if self.env is not None:
-            mask = self.env.action_masks()
-
         best_elevator_id = 0
         best_score = float('inf')
 
@@ -43,8 +38,10 @@ class NearestCarAgent:
         for elev in elevators:
             e_id = elev.elevator_id
             
-            # 過濾不可指派電梯
-            if mask is not None and not mask[e_id]:
+            # 檢查物理狀態過濾不可指派電梯：滿載或停用/故障
+            if elev.current_load >= elev.max_capacity:
+                continue
+            if elev.is_out_of_service:
                 continue
 
             distance = abs(elev.current_floor - current_call.floor)
@@ -59,11 +56,8 @@ class NearestCarAgent:
                 best_score = score
                 best_elevator_id = e_id
 
-        # 確保在極端情況下 (例如全部電梯被 mask)，仍回傳合法的隨機動作
+        # 確保在極端情況下 (例如全部電梯均滿載或停用)，仍指派預設電梯 0
         if best_score == float('inf'):
-            if mask is not None and np.any(mask):
-                best_elevator_id = int(np.argmax(mask))
-            else:
-                best_elevator_id = 0
+            best_elevator_id = 0
 
         return best_elevator_id, None

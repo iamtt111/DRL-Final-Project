@@ -332,3 +332,106 @@ class Elevator:
                         }))
 
         return events
+
+    def manual_update(self, action: int, dt: float) -> float:
+        """
+        手動更新電梯物理狀態與運動學 (Motor Control)
+        0: STOP/IDLE, 1: MOVE_UP, 2: MOVE_DOWN, 3: OPEN_DOOR
+        """
+        penalty = 0.0
+        self.current_time += dt
+
+        # 狀態與動作的約束處理
+        if action == 3:  # OPEN_DOOR
+            if self.current_velocity > 0.0:
+                # 行進中開門 - 無效且危險
+                penalty += -2.0
+                # 視同 STOP，減速
+                v_prev = self.current_velocity
+                self.current_velocity = max(0.0, self.current_velocity - self.acceleration * dt)
+                self.current_position += self.current_direction * 0.5 * (v_prev + self.current_velocity) * dt
+                self._state = ElevatorState.DECELERATE
+            else:
+                # 靜止，檢查是否對齊樓層
+                nearest_floor = min(range(len(self.floor_heights)), key=lambda f: abs(self.floor_heights[f] - self.current_position))
+                if abs(self.floor_heights[nearest_floor] - self.current_position) > 0.1:
+                    # 未對齊樓層開門 - 無效
+                    penalty += -2.0
+                    self._state = ElevatorState.IDLE
+                    self.current_direction = 0
+                else:
+                    self.current_position = self.floor_heights[nearest_floor]
+                    self._state = ElevatorState.DOOR_OPEN
+                    self.door_timer = self.door_open_time + self.door_close_time
+        else:
+            # 關閉門 (如果原本是開門狀態，現在選擇了移動或停止，門立即關閉)
+            if self._state == ElevatorState.DOOR_OPEN:
+                self._state = ElevatorState.IDLE
+                self.current_direction = 0
+                self.door_timer = 0.0
+
+            if action == 0:  # STOP/IDLE
+                if self.current_velocity > 0.0:
+                    v_prev = self.current_velocity
+                    self.current_velocity = max(0.0, self.current_velocity - self.acceleration * dt)
+                    self.current_position += self.current_direction * 0.5 * (v_prev + self.current_velocity) * dt
+                    self._state = ElevatorState.DECELERATE
+                else:
+                    self._state = ElevatorState.IDLE
+                    self.current_direction = 0
+                    self.time_since_idle += dt
+
+            elif action == 1:  # MOVE_UP
+                if self.current_position >= self.floor_heights[-1]:
+                    penalty += -2.0
+                    self.current_velocity = 0.0
+                    self.current_direction = 0
+                    self._state = ElevatorState.IDLE
+                else:
+                    # 如果原本下行，需先減速到 0
+                    if self.current_direction == -1 and self.current_velocity > 0.0:
+                        v_prev = self.current_velocity
+                        self.current_velocity = max(0.0, self.current_velocity - self.acceleration * dt)
+                        self.current_position += self.current_direction * 0.5 * (v_prev + self.current_velocity) * dt
+                        self._state = ElevatorState.DECELERATE
+                        if self.current_velocity == 0.0:
+                            self.current_direction = 0
+                    else:
+                        self.current_direction = 1
+                        v_prev = self.current_velocity
+                        self.current_velocity = min(self.rated_speed, self.current_velocity + self.acceleration * dt)
+                        self.current_position += self.current_direction * 0.5 * (v_prev + self.current_velocity) * dt
+                        self._state = ElevatorState.ACCELERATE if self.current_velocity < self.rated_speed else ElevatorState.CRUISE
+
+            elif action == 2:  # MOVE_DOWN
+                if self.current_position <= 0.0:
+                    penalty += -2.0
+                    self.current_velocity = 0.0
+                    self.current_direction = 0
+                    self._state = ElevatorState.IDLE
+                else:
+                    # 如果原本上行，需先減速到 0
+                    if self.current_direction == 1 and self.current_velocity > 0.0:
+                        v_prev = self.current_velocity
+                        self.current_velocity = max(0.0, self.current_velocity - self.acceleration * dt)
+                        self.current_position += self.current_direction * 0.5 * (v_prev + self.current_velocity) * dt
+                        self._state = ElevatorState.DECELERATE
+                        if self.current_velocity == 0.0:
+                            self.current_direction = 0
+                    else:
+                        self.current_direction = -1
+                        v_prev = self.current_velocity
+                        self.current_velocity = min(self.rated_speed, self.current_velocity + self.acceleration * dt)
+                        self.current_position += self.current_direction * 0.5 * (v_prev + self.current_velocity) * dt
+                        self._state = ElevatorState.ACCELERATE if self.current_velocity < self.rated_speed else ElevatorState.CRUISE
+
+            # 減速到 0 後自動對齊最近樓層
+            if self.current_velocity == 0.0 and self._state != ElevatorState.DOOR_OPEN:
+                nearest_floor = min(range(len(self.floor_heights)), key=lambda f: abs(self.floor_heights[f] - self.current_position))
+                self.current_position = self.floor_heights[nearest_floor]
+                self._state = ElevatorState.IDLE
+                self.current_direction = 0
+
+        # 防過衝邊界保護
+        self.current_position = max(0.0, min(self.current_position, self.floor_heights[-1]))
+        return penalty

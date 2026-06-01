@@ -51,19 +51,9 @@ class PrioritySystem:
         
         best_elev.assign_emergency(emergency_floor)
 
-        # 4. 重新分配被搶佔的大廳外呼任務到其他電梯
-        other_elevators = [e for e in building.elevators if e.elevator_id != best_elev.elevator_id and not e.is_out_of_service]
-        
-        if other_elevators:
-            for floor in hall_stops_to_redistribute:
-                # 尋找距離該樓層最近的電梯
-                best_other = min(other_elevators, key=lambda e: abs(e.current_position - building.floor_heights[floor]))
-                best_other.assign_hall_call(floor, 0)
-        else:
-            # 如果沒有其他電梯，只能塞回原電梯
-            for floor in hall_stops_to_redistribute:
-                best_elev.assign_hall_call(floor, 0)
-
+        # 4. 移除硬編碼重新分配邏輯：
+        # 被搶佔的大廳外呼任務將不直接指派給其他電梯。
+        # 它們會在接下來的模擬更新中，由環境的 _update_pending_assignments 自動掃描並重新加入動態競標佇列中。
         return True
 
     def _estimate_travel_time(self, elev: Elevator, target_height: float) -> float:

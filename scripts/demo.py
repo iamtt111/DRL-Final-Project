@@ -20,9 +20,15 @@ def main():
     config = load_config(args.config)
     
     # 確保開啟 Pygame 渲染模式
-    env = HospitalElevatorEnv(config=config, render_mode="human")
-    env.load_scenario(args.scenario)
-    obs, info = env.reset(seed=42)
+    if args.agent == "mappo":
+        from src.envs.elevator_ma_env import HospitalElevatorMAEnv
+        env = HospitalElevatorMAEnv(config=config, render_mode="human")
+        env.load_scenario(args.scenario)
+        obs, info = env.reset()
+    else:
+        env = HospitalElevatorEnv(config=config, render_mode="human")
+        env.load_scenario(args.scenario)
+        obs, info = env.reset(seed=42)
 
     # 載入選定的代理人 (對應不同的 args.agent)
     if args.agent == "ppo":
@@ -83,12 +89,18 @@ def main():
                         print("[DEMO] 搶佔失敗，所有電梯皆在處理急診或故障。將作為普通呼叫進行指派。")
                         
                     env.building.add_passenger(emg_passenger)
-                    env._update_pending_assignments()
+                    if hasattr(env, "_update_pending_assignments"):
+                        env._update_pending_assignments()
                     injected_emergency = True
 
                 # 獲取代理人決策並推進物理環境
                 action, _ = agent.predict(obs, deterministic=True)
-                obs, reward, terminated, truncated, info = env.step(action)
+                if args.agent == "mappo":
+                    obs, rewards, terminations, truncations, infos = env.step(action)
+                    terminated = all(terminations.values())
+                    truncated = all(truncations.values())
+                else:
+                    obs, reward, terminated, truncated, info = env.step(action)
                 
                 # 若模擬完成，轉移狀態至 SUMMARY，此時不跳出循環而是原地凍結渲染
                 if terminated or truncated:

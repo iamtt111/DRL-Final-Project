@@ -12,12 +12,13 @@ from src.utils.config_loader import load_config
 
 class MAPPOBuffer:
     """
-    用於 MAPPO 集中訓練、分佈執行的 Trajectory 緩衝區
+    用於 MAPPO 集中訓練、分佈執行的 Trajectory 緩衝區 (支援 Action Masking 與 Discrete 動作)
     """
     def __init__(self, num_agents: int, obs_dim: int, state_dim: int, capacity: int):
         self.obs = np.zeros((capacity, num_agents, obs_dim), dtype=np.float32)
         self.actions = np.zeros((capacity, num_agents, 1), dtype=np.float32)
         self.log_probs = np.zeros((capacity, num_agents, 1), dtype=np.float32)
+        self.action_masks = np.zeros((capacity, num_agents, 4), dtype=np.bool_)
         self.states = np.zeros((capacity, state_dim), dtype=np.float32)
         self.rewards = np.zeros((capacity, 1), dtype=np.float32)
         self.dones = np.zeros((capacity, 1), dtype=np.float32)
@@ -27,13 +28,14 @@ class MAPPOBuffer:
         self.ptr = 0
         self.max_size = capacity
 
-    def store(self, obs: Dict[int, np.ndarray], act: Dict[int, float], log_prob: Dict[int, float], state: np.ndarray, reward: float, done: bool, val: float):
+    def store(self, obs: Dict[int, np.ndarray], act: Dict[int, int], log_prob: Dict[int, float], masks: np.ndarray, state: np.ndarray, reward: float, done: bool, val: float):
         if self.ptr >= self.max_size:
             return
         for i in range(len(obs)):
             self.obs[self.ptr, i] = obs[i]
             self.actions[self.ptr, i] = act[i]
             self.log_probs[self.ptr, i] = log_prob[i]
+            self.action_masks[self.ptr, i] = masks[i]
         self.states[self.ptr] = state
         self.rewards[self.ptr] = reward
         self.dones[self.ptr] = done
@@ -63,6 +65,7 @@ class MAPPOBuffer:
         obs_t = torch.FloatTensor(self.obs[:self.ptr])
         actions_t = torch.FloatTensor(self.actions[:self.ptr])
         log_probs_t = torch.FloatTensor(self.log_probs[:self.ptr])
+        masks_t = torch.BoolTensor(self.action_masks[:self.ptr])
         states_t = torch.FloatTensor(self.states[:self.ptr])
         returns_t = torch.FloatTensor(self.returns[:self.ptr])
         advantages_t = torch.FloatTensor(self.advantages[:self.ptr])
@@ -78,6 +81,7 @@ class MAPPOBuffer:
                 obs_t[batch_indices],
                 actions_t[batch_indices],
                 log_probs_t[batch_indices],
+                masks_t[batch_indices],
                 states_t[batch_indices],
                 returns_t[batch_indices],
                 advantages_t[batch_indices]
@@ -96,14 +100,16 @@ def evaluate(env: HospitalElevatorMAEnv, actor: MAPPOActor, n_episodes: int = 10
         
         while not done:
             actions = {}
+            masks = env.action_masks()
             for i in range(num_agents):
                 obs_t = torch.FloatTensor(obs[i]).unsqueeze(0)
+                mask_t = torch.BoolTensor(masks[i]).unsqueeze(0)
                 with torch.no_grad():
-                    bid, _ = actor.get_action(obs_t, deterministic=True)
-                    actions[i] = bid.numpy()[0]
+                    action, _ = actor.get_action(obs_t, action_masks=mask_t, deterministic=True)
+                    actions[i] = int(action.numpy()[0, 0])
                     
             obs, rewards, terminations, truncations, infos = env.step(actions)
-            episode_reward += rewards[0]  # 由於所有代理人共享獎勵，取 0 的獎勵即為全局獎勵
+            episode_reward += rewards[0]  # 由於所有代理人共享獎勵，取 0 的獎勵即為全域獎勵
             done = all(terminations.values())
             
         total_rewards.append(episode_reward)
@@ -175,15 +181,17 @@ def main():
         for _ in range(buffer_capacity):
             actions = {}
             log_probs = {}
+            masks = env.action_masks() # (num_agents, 4)
             
-            # 對於每台電梯計算觀察值與輸出 Action Bid
+            # 對於每台電梯計算觀察值與輸出 Action
             for idx in range(num_agents):
                 local_obs = obs[idx]
                 obs_t = torch.FloatTensor(local_obs).unsqueeze(0)
+                mask_t = torch.BoolTensor(masks[idx]).unsqueeze(0)
                 
                 with torch.no_grad():
-                    bid, log_prob = actor.get_action(obs_t, deterministic=False)
-                    actions[idx] = float(bid.numpy()[0, 0])
+                    action, log_prob = actor.get_action(obs_t, action_masks=mask_t, deterministic=False)
+                    actions[idx] = int(action.numpy()[0, 0])
                     log_probs[idx] = float(log_prob.numpy()[0, 0])
 
             # 獲取集中式 Critic 的狀態值估計
@@ -198,7 +206,7 @@ def main():
             done = all(terminations.values())
 
             # 儲存到 buffer
-            buffer.store(obs, actions, log_probs, global_state, reward, done, val)
+            buffer.store(obs, actions, log_probs, masks, global_state, reward, done, val)
             
             obs = next_obs
             current_timesteps += 1
@@ -230,7 +238,7 @@ def main():
             
             for _ in range(n_epochs):
                 for batch in buffer.get_batches(batch_size):
-                    batch_obs, batch_actions, batch_log_probs, batch_states, batch_returns, batch_advantages = batch
+                    batch_obs, batch_actions, batch_log_probs, batch_masks, batch_states, batch_returns, batch_advantages = batch
                     
                     # 1. 集中式 Critic 更新
                     values = critic(batch_states)
@@ -247,11 +255,12 @@ def main():
                     batch_obs_flat = batch_obs.view(B * num_agents, obs_dim)
                     batch_actions_flat = batch_actions.view(B * num_agents, 1)
                     batch_log_probs_flat = batch_log_probs.view(B * num_agents, 1)
+                    batch_masks_flat = batch_masks.view(B * num_agents, 4)
                     
                     # 重複擴展 advantages 到所有 agent 上
                     batch_advantages_flat = batch_advantages.repeat_interleave(num_agents, dim=0)
                     
-                    new_log_probs_flat, entropy_flat = actor.evaluate_actions(batch_obs_flat, batch_actions_flat)
+                    new_log_probs_flat, entropy_flat = actor.evaluate_actions(batch_obs_flat, batch_actions_flat, action_masks=batch_masks_flat)
                     
                     ratio = torch.exp(new_log_probs_flat - batch_log_probs_flat)
                     surr1 = ratio * batch_advantages_flat

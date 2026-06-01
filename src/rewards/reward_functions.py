@@ -16,7 +16,7 @@ def calculate_reward(
     Rt = -(w1 * T_wait + w2 * E_energy + w3 * P_emergency) + R_bonus
     """
     if weights is None:
-        weights = {"wait": 0.3, "energy": 0.1, "emergency": 0.6}
+        weights = {"wait": 0.4, "energy": 0.1, "emergency": 0.5}
     if thresholds is None:
         thresholds = {3: 30.0, 2: 60.0, 1: 45.0}  # Level 3: 30s, Level 2: 60s, Level 1: 45s
     if gamma_weights is None:
@@ -89,6 +89,10 @@ def calculate_reward(
             
             # (t_wait / t_threshold)^2
             p_emergency += gamma * ((wait_time / t_thresh) ** 2)
+            
+            # 針對 Level 3 急診任務超時（超過 30 秒即視為丟失/失敗）施加巨大懲罰，以確保 ECR 達 100%
+            if p_level == 3 and wait_time > t_thresh:
+                p_emergency += 50.0 + 5.0 * (wait_time - t_thresh)
 
     # ==========================================
     # 4. 獎金項 (R_bonus)

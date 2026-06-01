@@ -45,9 +45,12 @@ def test_priority_preemption():
     # 電梯 0 的緊急目標應設定為 3
     assert elev0.emergency_target == 3
     
-    # 電梯 0 原本的外呼停靠站 (1 和 2) 應被重新分配給電梯 1
-    assert 1 in elev1.pending_stops
-    assert 2 in elev1.pending_stops
+    # 電梯 0 原本的外呼停靠站 (1 和 2) 應被清除以供動態競標重分配
+    assert 1 not in elev0.pending_stops
+    assert 2 not in elev0.pending_stops
+    # 電梯 1 在此階段不應被硬編碼直接分派任務
+    assert 1 not in elev1.pending_stops
+    assert 2 not in elev1.pending_stops
 
 
 def test_moving_preemption():

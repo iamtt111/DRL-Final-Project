@@ -16,8 +16,13 @@ def test_mappo_env_reset_and_step():
         assert o.shape == (env.local_obs_dim,)
         assert o.dtype == np.float32
 
-    # Step with continuous bids
-    actions = {i: [0.5 + 0.1 * i] for i in range(env.num_elevators)}
+    # Verify action masks shape and type
+    masks = env.action_masks()
+    assert masks.shape == (env.num_elevators, 4)
+    assert masks.dtype == bool
+
+    # Step with Discrete(4) motor commands
+    actions = {i: 0 for i in range(env.num_elevators)}  # All choose STOP/IDLE
     next_obs, rewards, terminations, truncations, next_infos = env.step(actions)
     
     assert isinstance(next_obs, dict)
@@ -37,18 +42,28 @@ def test_mappo_agent_predict():
     env = HospitalElevatorMAEnv()
     env.reset(seed=42)
     
-    # Instantiate agent
-    agent = MAPPOAgent(env=env)
+    # Instantiate agent (obs_dim=83, state_dim=183)
+    agent = MAPPOAgent(env=env, obs_dim=env.local_obs_dim)
     
-    # Predict on random observation
+    # Predict on multi-agent observations dict
+    obs, _ = env.reset()
+    actions, _ = agent.predict(obs, deterministic=True)
+    
+    assert isinstance(actions, dict)
+    assert len(actions) == env.num_elevators
+    for i in range(env.num_elevators):
+        assert isinstance(actions[i], int)
+        assert 0 <= actions[i] < 4
+
+    # Predict on single elevator observation
     dummy_obs = np.zeros(env.local_obs_dim, dtype=np.float32)
     action, _ = agent.predict(dummy_obs, deterministic=True)
     
     assert isinstance(action, int)
-    assert 0 <= action < env.num_elevators
+    assert 0 <= action < 4
 
 def test_mappo_networks():
-    obs_dim = 23
+    obs_dim = 83
     state_dim = 183
     
     actor = MAPPOActor(obs_dim=obs_dim)
@@ -56,14 +71,21 @@ def test_mappo_networks():
     
     dummy_obs_t = torch.zeros((5, obs_dim))
     dummy_state_t = torch.zeros((5, state_dim))
+    dummy_masks_t = torch.ones((5, 4), dtype=torch.bool)
     
-    mu, std = actor(dummy_obs_t)
-    assert mu.shape == (5, 1)
-    assert std.shape == (5, 1)
+    logits = actor(dummy_obs_t)
+    assert logits.shape == (5, 4)
     
-    action, log_prob = actor.get_action(dummy_obs_t, deterministic=False)
+    action, log_prob = actor.get_action(dummy_obs_t, action_masks=dummy_masks_t, deterministic=False)
     assert action.shape == (5, 1)
     assert log_prob.shape == (5, 1)
+    
+    # Check action values are valid discrete values
+    assert torch.all(action >= 0) and torch.all(action < 4)
+    
+    log_prob, entropy = actor.evaluate_actions(dummy_obs_t, action, action_masks=dummy_masks_t)
+    assert log_prob.shape == (5, 1)
+    assert entropy.shape == (5, 1)
     
     val = critic(dummy_state_t)
     assert val.shape == (5, 1)

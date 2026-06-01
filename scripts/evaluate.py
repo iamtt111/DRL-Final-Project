@@ -3,7 +3,6 @@ import numpy as np
 import yaml
 import os
 from src.envs.elevator_env import HospitalElevatorEnv
-from src.agents.ppo_agent import PPOAgent
 from src.agents.rule_based import NearestCarAgent
 from src.agents.sarsa_agent import SarsaAgent
 from src.utils.config_loader import load_config
@@ -15,28 +14,38 @@ def evaluate_policy(env, agent, n_episodes: int = 20) -> dict:
     all_ert = []
     all_nss = []
     all_eni = []
-    all_scr = []
     all_ecr = []
     all_lbi = []
     all_passengers = []
 
+    is_ma = (env.__class__.__name__ == "HospitalElevatorMAEnv")
+
     for ep in range(n_episodes):
-        obs, info = env.reset()
+        if is_ma:
+            obs, infos = env.reset()
+        else:
+            obs, info = env.reset()
+            
         done = False
         
         # 暫存此 episode 的事件與指標
         passengers_delivered = []
         elevator_starts = [0] * len(env.building.elevators)
-        prev_states = [None] * len(env.building.elevators)
+        prev_velocities = [0.0] * len(env.building.elevators)
         
         # 模擬事件迴圈
         while not done:
             action, _ = agent.predict(obs, deterministic=True)
-            obs, reward, terminated, truncated, info = env.step(action)
-            done = terminated or truncated
+            if is_ma:
+                obs, rewards, terminations, truncations, infos = env.step(action)
+                done = all(terminations.values()) or all(truncations.values())
+                step_events = infos[0].get("step_events", []) if (isinstance(infos, dict) and 0 in infos) else []
+            else:
+                obs, reward, terminated, truncated, info = env.step(action)
+                done = terminated or truncated
+                step_events = info.get("step_events", [])
 
             # 收集此步產出的乘客運送事件
-            step_events = info.get("step_events", [])
             for event in step_events:
                 if event.type.value == "passenger_delivered":
                     passengers_delivered.append(event.data)
@@ -44,9 +53,13 @@ def evaluate_policy(env, agent, n_episodes: int = 20) -> dict:
                         "wait_time": float(event.data["wait_time"]),
                         "priority": int(event.data["priority"])
                     })
-                elif event.type.value == "elevator_arrived":
-                    elev_id = event.data["elevator_id"]
-                    elevator_starts[elev_id] += 1
+
+            # 使用速度變化來精確計算啟停次數 (NSS)
+            for idx, elev in enumerate(env.building.elevators):
+                curr_vel = elev.current_velocity
+                if prev_velocities[idx] == 0.0 and curr_vel > 0.0:
+                    elevator_starts[idx] += 1
+                prev_velocities[idx] = curr_vel
 
         # 計算本集 KPI
         # 1. 等待時間 (AWT) 與優先權等待時間 (PWT)
@@ -67,8 +80,7 @@ def evaluate_policy(env, agent, n_episodes: int = 20) -> dict:
         # 2. 啟停次數 (NSS)
         nss = sum(elevator_starts)
         
-        # 3. 能耗指數 (ENI - 簡化計算為運行總高度)
-        # 我們直接統計每台電梯在物理運動下的移動總距離
+        # 3. 能耗指數 (ENI - 運行總高度)
         eni = sum(abs(elev.current_position) for elev in env.building.elevators) / 3.0 # 除以樓層高度
 
         # 4. 負載均衡度 (LBI - 車廂人數標準差)
@@ -104,19 +116,22 @@ def evaluate_policy(env, agent, n_episodes: int = 20) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate Elevator EGCS policy")
-    parser.add_argument("--agent", type=str, required=True, choices=["ppo", "sarsa", "rule", "mappo"], help="Agent type")
+    parser.add_argument("--agent", type=str, required=True, choices=["sarsa", "rule", "mappo"], help="Agent type")
     parser.add_argument("--model-path", type=str, default=None, help="Path to trained model weight zip/npz")
     parser.add_argument("--episodes", type=int, default=20, help="Number of episodes")
     parser.add_argument("--config", type=str, default=None, help="Config yaml path")
     args = parser.parse_args()
 
     config = load_config(args.config)
-    env = HospitalElevatorEnv(config=config)
+    if args.agent == "mappo":
+        from src.envs.elevator_ma_env import HospitalElevatorMAEnv
+        env = HospitalElevatorMAEnv(config=config)
+    else:
+        from src.envs.elevator_env import HospitalElevatorEnv
+        env = HospitalElevatorEnv(config=config)
 
     # 載入代理人
-    if args.agent == "ppo":
-        agent = PPOAgent(model_path=args.model_path, env=env)
-    elif args.agent == "sarsa":
+    if args.agent == "sarsa":
         agent = SarsaAgent(env=env)
         if args.model_path:
             agent.load(args.model_path)
