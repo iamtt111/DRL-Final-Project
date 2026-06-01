@@ -90,9 +90,9 @@ def calculate_reward(
             # (t_wait / t_threshold)^2
             p_emergency += gamma * ((wait_time / t_thresh) ** 2)
             
-            # 針對 Level 3 急診任務超時（超過 30 秒即視為丟失/失敗）施加巨大懲罰，以確保 ECR 達 100%
+            # 針對 Level 3 急診任務超時（超過 30 秒）施加平滑連續的二次方懲罰，以避免梯度尖峰
             if p_level == 3 and wait_time > t_thresh:
-                p_emergency += 50.0 + 5.0 * (wait_time - t_thresh)
+                p_emergency += 0.5 * ((wait_time - t_thresh) ** 2)
 
     # ==========================================
     # 4. 獎金項 (R_bonus)

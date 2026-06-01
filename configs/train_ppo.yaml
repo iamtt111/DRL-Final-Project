@@ -1,5 +1,5 @@
 ppo:
-  learning_rate: 0.0003        # 學習率
+  learning_rate: 0.0001        # 學習率
   n_steps: 2048                # 每次更新前收集的步數
   batch_size: 64               # Mini-batch 大小
   n_epochs: 10                 # 每次更新的 epoch 數
@@ -7,7 +7,7 @@ ppo:
   gae_lambda: 0.95             # GAE λ 參數
   clip_range: 0.2              # PPO clipping 範圍
   clip_range_vf: null          # Value function clipping (不啟用)
-  ent_coef: 0.01               # 熵正則化係數（鼓勵探索）
+  ent_coef: 0.05               # 熵正則化係數（鼓勵探索）
   vf_coef: 0.5                 # Value loss 權重
   max_grad_norm: 0.5           # 梯度裁剪
   policy_kwargs:

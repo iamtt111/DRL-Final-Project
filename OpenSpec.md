@@ -210,14 +210,15 @@ priority:
 
 | 特徵                   | 維度 | 編碼方式                     | 值域         | 說明                           |
 | ---------------------- | ---- | ---------------------------- | ------------ | ------------------------------ |
-| `position`             | 1    | 正規化到 $[0, 1]$           | $[0, 1]$    | 當前樓層 / 最高樓層            |
+| `position`             | $N_f$ | One-hot per floor           | $\{0,1\}^{N_f}$| 當前所在樓層的 one-hot 編碼    |
 | `direction`            | 1    | $\{-1, 0, +1\}$             | $[-1, 1]$   | 下行 / 靜止 / 上行             |
 | `load_ratio`           | 1    | 當前載客 / 額定容量           | $[0, 1]$    | 擁擠度                         |
 | `door_state`           | 1    | $\{0, 1\}$                  | $\{0, 1\}$ | 門關閉 = 0 / 門開啟 = 1        |
-| `internal_calls`       | $N_f$ | Binary one-hot per floor   | $\{0,1\}^{N_f}$ | 轎廂內各樓層按鈕狀態       |
+| `internal_calls`       | $N_f$ | Binary multi-hot per floor   | $\{0,1\}^{N_f}$ | 轎廂內各樓層按鈕狀態       |
 | `time_since_idle`      | 1    | 正規化秒數                   | $[0, 1]$    | 閒置時間（用於負載均衡優化）   |
+| `active_emergency`     | 0    | (Removed in favor of global) | -            | (已移至全域特徵)              |
 
-**每台電梯子向量維度**: $4 + N_f + 1 = N_f + 5$
+**每台電梯子向量維度**: $2 \times N_f + 4$
 
 #### 3.2.2 大廳呼叫子向量 (Hall Calls)
 
@@ -252,13 +253,13 @@ priority:
 #### 3.2.5 狀態空間總維度
 
 $$
-\dim(\mathcal{S}) = N_e \times (N_f + 5) + 4 \times N_f + 2 \times N_f + 3
+\dim(\mathcal{S}) = N_e \times (2 \times N_f + 4) + 4 \times N_f + 2 \times N_f + 3
 $$
 
 以 $N_e = 4, N_f = 16$ 為例：
 
 $$
-\dim(\mathcal{S}) = 4 \times 21 + 64 + 32 + 3 = 84 + 64 + 32 + 3 = \mathbf{183}
+\dim(\mathcal{S}) = 4 \times 36 + 64 + 32 + 3 = 144 + 64 + 32 + 3 = \mathbf{243}
 $$
 
 > [!NOTE]
@@ -407,12 +408,12 @@ $$
 #### 4.1.2 網路架構
 
 ```
-State Vector (dim=183)
+State Vector (dim=243)
     │
     ▼
 ┌─────────────┐
 │ Shared MLP   │  ← 共享特徵提取層
-│ FC(183, 256) │
+│ FC(243, 256) │
 │ ReLU         │
 │ FC(256, 256) │
 │ ReLU         │
@@ -435,7 +436,7 @@ State Vector (dim=183)
 
 ```yaml
 ppo:
-  learning_rate: 3.0e-4        # 學習率
+  learning_rate: 1.0e-4        # 學習率
   n_steps: 2048                # 每次更新前收集的步數
   batch_size: 64               # Mini-batch 大小
   n_epochs: 10                 # 每次更新的 epoch 數
@@ -443,7 +444,7 @@ ppo:
   gae_lambda: 0.95             # GAE λ 參數
   clip_range: 0.2              # PPO clipping 範圍
   clip_range_vf: null          # Value function clipping (不啟用)
-  ent_coef: 0.01               # 熵正則化係數（鼓勵探索）
+  ent_coef: 0.05               # 熵正則化係數（鼓勵探索）
   vf_coef: 0.5                 # Value loss 權重
   max_grad_norm: 0.5           # 梯度裁剪
   policy_kwargs:

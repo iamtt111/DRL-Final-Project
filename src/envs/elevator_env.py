@@ -37,8 +37,8 @@ class HospitalElevatorEnv(gym.Env):
         self.max_time = 600.0  # 每個 Episode 的模擬長度為 10 分鐘 (600秒)
 
         # Gymnasium 空間定義
-        # 183 維的扁平化狀態向量
-        state_dim = self.num_elevators * (self.num_floors + 5) + 4 * self.num_floors + 2 * self.num_floors + 3
+        # 243 維的扁平化狀態向量 (採用 one-hot 樓層編碼)
+        state_dim = self.num_elevators * (2 * self.num_floors + 4) + 4 * self.num_floors + 2 * self.num_floors + 3
         self.observation_space = spaces.Box(
             low=0.0, high=1.0, shape=(state_dim,), dtype=np.float32
         )

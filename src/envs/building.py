@@ -246,15 +246,16 @@ class Building:
 
     def get_state_vector(self, max_time: float = 600.0) -> np.ndarray:
         """
-        生成扁平化狀態向量 (dim=183 for Ne=4, Nf=16)
+        生成扁平化狀態向量 (dim=243 for Ne=4, Nf=16, using one-hot floor representation)
         """
         state_parts = []
 
         # 1. 電梯狀態子向量 (per elevator)
         for elev in self.elevators:
-            # position: 正規化到 [0, 1]
-            pos_norm = elev.current_position / self.max_height if self.max_height > 0 else 0.0
-            state_parts.append(pos_norm)
+            # position: 16-dimensional one-hot representation of current floor
+            floor_one_hot = [0.0] * self.num_floors
+            floor_one_hot[elev.current_floor] = 1.0
+            state_parts.extend(floor_one_hot)
             
             # direction: {-1, 0, 1}
             state_parts.append(float(elev.current_direction))

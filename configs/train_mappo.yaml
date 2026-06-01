@@ -1,21 +1,21 @@
 mappo:
-  learning_rate: 0.0003
+  learning_rate: 0.0001
   gamma: 0.99
   gae_lambda: 0.95
   clip_range: 0.2
-  ent_coef: 0.01
+  ent_coef: 0.05
   vf_coef: 0.5
   max_grad_norm: 0.5
   hidden_dim: 256
   n_epochs: 10
   batch_size: 64
   buffer_capacity: 2048
-  total_timesteps: 1500000
+  total_timesteps: 1000000
   eval_freq: 10000
   n_eval_episodes: 10
 
 reward:
   weights:
-    wait: 0.55
+    wait: 0.5
     energy: 0.05
-    emergency: 0.40
+    emergency: 0.45

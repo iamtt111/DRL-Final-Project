@@ -90,4 +90,4 @@ def test_state_vector():
     b.reset(None)
     
     vec = b.get_state_vector()
-    assert vec.shape == (183,)
+    assert vec.shape == (243,)
