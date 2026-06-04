@@ -57,11 +57,23 @@ class MAPPOCritic(nn.Module):
     """
     MAPPO Centralized Critic Network in PyTorch
     Maps global/centralized state to state value V(S).
+    Supports floor-level feature embedding if state_dim matches 243.
     """
     def __init__(self, state_dim: int, hidden_dim: int = 256):
         super().__init__()
+        self.state_dim = state_dim
+        self.use_embedding = (state_dim == 243)
+
+        if self.use_embedding:
+            # 樓層相關 16 維特徵嵌入到 4 維
+            self.floor_embed = nn.Linear(16, 4)
+            # 嵌入後維度: 48 (電梯) + 24 (大廳/優先) + 3 (全域) = 75
+            input_dim = 75
+        else:
+            input_dim = state_dim
+
         self.net = nn.Sequential(
-            nn.Linear(state_dim, hidden_dim),
+            nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
@@ -71,7 +83,62 @@ class MAPPOCritic(nn.Module):
         )
 
     def forward(self, state: torch.Tensor) -> torch.Tensor:
-        return self.net(state)
+        if not self.use_embedding:
+            return self.net(state)
+
+        # 結構化提取特徵並做 Embedding
+        # 為了相容 batch 和單一樣本，我們在倒數第一維上進行切片與處理
+        is_batched = (state.dim() > 1)
+        if not is_batched:
+            state = state.unsqueeze(0)  # shape: (1, 243)
+
+        batch_size = state.size(0)
+
+        # 1. 電梯部分 (4部電梯，每部 36 維，共 144 維)
+        elev_embeddings = []
+        for j in range(4):
+            start = j * 36
+            
+            # floor_one_hot (16)
+            f_onehot = state[:, start : start + 16]
+            f_onehot_embed = self.floor_embed(f_onehot)
+            
+            # direction, load_ratio, door_state (3)
+            phys_feats = state[:, start + 16 : start + 19]
+            
+            # internal_calls (16)
+            int_calls = state[:, start + 19 : start + 35]
+            int_calls_embed = self.floor_embed(int_calls)
+            
+            # idle_norm (1)
+            idle_feat = state[:, start + 35 : start + 36]
+            
+            # 拼接此電梯特徵 -> (batch_size, 12)
+            elev_feat = torch.cat([f_onehot_embed, phys_feats, int_calls_embed, idle_feat], dim=-1)
+            elev_embeddings.append(elev_feat)
+            
+        elev_part = torch.cat(elev_embeddings, dim=-1)  # shape: (batch_size, 48)
+
+        # 2. 大廳與優先級部分 (6個 16 維向量，共 96 維，從 144 開始)
+        hall_embeddings = []
+        for idx in range(6):
+            start = 144 + idx * 16
+            vec = state[:, start : start + 16]
+            vec_embed = self.floor_embed(vec)
+            hall_embeddings.append(vec_embed)
+            
+        hall_part = torch.cat(hall_embeddings, dim=-1)  # shape: (batch_size, 24)
+
+        # 3. 全域特徵 (3維，從 240 開始)
+        global_part = state[:, 240 : 243]  # shape: (batch_size, 3)
+
+        # 拼接所有部分 -> shape: (batch_size, 75)
+        embedded_state = torch.cat([elev_part, hall_part, global_part], dim=-1)
+
+        if not is_batched:
+            embedded_state = embedded_state.squeeze(0)
+
+        return self.net(embedded_state)
 
 
 def get_mappo_obs_for_elevator(env: Any, agent_id: int) -> np.ndarray:

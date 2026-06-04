@@ -150,6 +150,15 @@ def main():
 
     # 3. 建立神經網路與優化器
     actor = MAPPOActor(obs_dim=obs_dim, hidden_dim=hidden_dim)
+    
+    # 載入預訓練的 Actor 權重 (冷啟動)
+    pretrain_path = "models/mappo/pretrain_actor.pt"
+    if os.path.exists(pretrain_path):
+        actor.load_state_dict(torch.load(pretrain_path, map_location=torch.device('cpu')))
+        print(f"Successfully loaded pretrained MAPPO Actor weights from {pretrain_path}")
+    else:
+        print("No pretrained MAPPO Actor weights found. Training from scratch.")
+        
     critic = MAPPOCritic(state_dim=state_dim, hidden_dim=hidden_dim)
     
     actor_opt = optim.Adam(actor.parameters(), lr=lr)

@@ -16,6 +16,6 @@ mappo:
 
 reward:
   weights:
-    wait: 0.5
+    wait: 0.4
     energy: 0.05
-    emergency: 0.45
+    emergency: 0.55
