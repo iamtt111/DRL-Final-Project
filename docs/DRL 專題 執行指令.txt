@@ -1,0 +1,24 @@
+DRL 專題 執行指令
+訓練mappo
+1. 實驗室電腦cmd
+2. .\venv_mappo\Scripts\Activate.ps1
+3. $env:CUDA_VISIBLE_DEVICES="0"
+4. python -m scripts.train_mappo --timesteps 1500000
+
+方法間比較
+python -m scripts.compare_baselines --episodes 100
+
+DEMO
+python scripts/demo_app.py 
+
+上傳zhen分支
+1. git checkout zhen
+2. git add .
+3. git commit -m ""
+4. git push origin zhen
+
+從zhen分支下載到本地
+1. git clone https://github.com/iamtt111/DRL-Final-Project.git
+2. cd DRL-Final-Project
+3. git checkout zhen
+4. git branch
