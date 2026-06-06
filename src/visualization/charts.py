@@ -46,7 +46,7 @@ def generate_all_plots(results_json_path: str = "docs/benchmark_results.json") -
     algorithms = ["Nearest Car", "SARSA(λ)", "MaskablePPO", "MAPPO"]
 
     # 確保輸出目錄存在
-    save_dir = "docs/images"
+    save_dir = "docs/plots"
     os.makedirs(save_dir, exist_ok=True)
 
     import datetime
@@ -418,11 +418,11 @@ def generate_all_plots(results_json_path: str = "docs/benchmark_results.json") -
 
     print(f"All plots have been successfully generated under {save_dir}/")
     return {
-        "awt": f"docs/images/comparison_awt_{timestamp}.png",
-        "training": f"docs/images/training_convergence_{timestamp}.png",
-        "radar": f"docs/images/comparison_radar_{timestamp}.png",
-        "boxplot": f"docs/images/comparison_priority_boxplot_{timestamp}.png",
-        "tradeoff": f"docs/images/comparison_tradeoff_{timestamp}.png",
+        "awt": f"docs/plots/comparison_awt_{timestamp}.png",
+        "training": f"docs/plots/training_convergence_{timestamp}.png",
+        "radar": f"docs/plots/comparison_radar_{timestamp}.png",
+        "boxplot": f"docs/plots/comparison_priority_boxplot_{timestamp}.png",
+        "tradeoff": f"docs/plots/comparison_tradeoff_{timestamp}.png",
         "cdf": cdf_path,
         "disaster": disaster_path
     }
@@ -495,7 +495,7 @@ def plot_emergency_cdf(scenarios_data, save_dir, timestamp):
     plt.savefig(cdf_path, dpi=300)
     plt.close()
     print(f"Saved: {cdf_path}")
-    return f"docs/images/comparison_cdf_{timestamp}.png"
+    return f"docs/plots/comparison_cdf_{timestamp}.png"
 
 def plot_disaster_crisis_comparison(scenarios_data, save_dir, timestamp):
     """繪製災難危機情境下，不同優先權乘客的平均等待時間與 95% 分位數等待時間對比"""
@@ -566,5 +566,5 @@ def plot_disaster_crisis_comparison(scenarios_data, save_dir, timestamp):
     plt.savefig(disaster_path, dpi=300)
     plt.close()
     print(f"Saved: {disaster_path}")
-    return f"docs/images/comparison_disaster_{timestamp}.png"
+    return f"docs/plots/comparison_disaster_{timestamp}.png"
 

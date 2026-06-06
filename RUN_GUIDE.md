@@ -78,14 +78,14 @@ pip install -e .
 
 *   **執行後成果**：
     1.  會自動讀取 100 回合原始數據，將 **MAPPO**、**MaskablePPO**、**SARSA(λ)** 與 **Nearest Car** 四種演算法進行橫向統計對比。
-    2.  在 `docs/images/` 目錄下重新渲染並存檔以下七張高清學術圖表：
+    2.  在 `docs/plots/` 目錄下重新渲染並存檔以下七張高清學術圖表：
         *   `comparison_tradeoff_*.png` (AWT vs. ERT 的 Pareto Frontier 雙標權衡圖)
         *   `comparison_cdf_*.png` (急診等待時間的累積機率 CDF 分佈圖)
         *   `comparison_disaster_*.png` (災難極端高負載分級箱線圖)
         *   `comparison_awt_*.png` (普通 vs. 急診等待時間對比長條圖，附 Welch's t-test 顯著性標註)
-        *   `comparison_priority_boxplot.png` (優先級等待分布箱線圖)
-        *   `comparison_radar.png` (多目標綜合雷達圖)
-        *   `training_convergence.png` (強化學習訓練收斂曲線)
+        *   `comparison_priority_boxplot_*.png` (優先級等待分布箱線圖)
+        *   `comparison_radar_*.png` (多目標綜合雷達圖)
+        *   `training_convergence_*.png` (強化學習訓練收斂曲線)
     3.  自動重寫 `docs/evaluation_report.md` 為最新的繁體中文版學術評估報告，並帶有 4 欄數據對比表與最新的學術圖片路徑。
 
 ---

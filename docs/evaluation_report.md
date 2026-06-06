@@ -1,5 +1,5 @@
 # 🏥 智慧醫院電梯群控系統 (Hospital EGCS) 學術評估報告
-*報告生成時間: 2026-06-06 22:36:27*
+*報告生成時間: 2026-06-04 18:05:36*
 
 ## 一、 執行摘要 (Executive Summary)
 本評估報告旨在橫向對比 **MAPPO (多智能體 PPO)** 演算法、**MaskablePPO (單智能體 PPO)**、**SARSA(λ)** 與傳統啟發式規則 **Nearest Car (最近車輛優先)** 在醫院電梯群控系統中的調度效能。
@@ -49,7 +49,7 @@
 
 ## 三、 學術圖表與深度分析 (Visualizations & Deep Analysis)
 ### 1. 多目標權衡與 Pareto 邊界分析 (Pareto Frontier)
-![Pareto Frontier](images/comparison_tradeoff_20260606_223622.png)
+![Pareto Frontier](plots/comparison_tradeoff_20260604_180531.png)
 
 **學術分析與發現：**
 *   **權衡的生命價值**：在早高峰 (Morning Peak) 中，Nearest Car 為了追求普遍人的低等待時間 (AWT = 24.05s)，其急診響應時間 (ERT) 惡化到了 **9.38 秒**，急診完成率 (ECR) 僅有 **93.45%**。這意味著有近 6.5% 的急診任務被拖延甚至犧牲。
@@ -58,7 +58,7 @@
 *   **Pareto 最優性**：從 AWT vs ERT 的二維散點圖可以看出，Nearest Car 落在局部貪婪的極端，而 PPO 與 SARSA 嚴重偏離前沿，唯有 **MAPPO 完美落在 Pareto 效率前沿 (Pareto Frontier) 上**，證明其多智能體架架構能有效解決動作空間爆炸，取得全域最佳權衡。
 
 ### 2. 急診等待時間的累積機率分佈分析 (Cumulative Distribution Function - CDF)
-![CDF Plot](images/comparison_cdf_20260606_223622.png)
+![CDF Plot](plots/comparison_cdf_20260604_180531.png)
 
 **學術分析與發現：**
 *   **長尾效應的消除**：平均值 (Average) 往往會掩蓋極端痛苦。傳統 Nearest Car 因為是貪婪演算法，缺乏全局調度的協同，在高峰期會發生「急診患者在大廳苦等數百秒」的極端長尾情況 (早高峰 Max 等待高達 175s，晚高峰更達 274s)。
@@ -66,7 +66,7 @@
 *   **現代 AI 基準對比**：MaskablePPO 由於單智能體控制導致決策效率低下，其 CDF 曲線在 10 秒時僅達 75.8% (晚高峰) 與 90.6% (早高峰，但 AWT 犧牲過大)。這顯示了引入多智能體協同（MAPPO）相比單智能體（PPO）在保障醫療應急指標時的巨大領先優勢。
 
 ### 3. Disaster Crisis 災難危機極端情境對比
-![Disaster Crisis Comparison](images/comparison_disaster_20260606_223622.png)
+![Disaster Crisis Comparison](plots/comparison_disaster_20260604_180531.png)
 
 **學術分析與發現：**
 *   **極端高負載下的資源傾斜**：在 `disaster_crisis` (如災難大量傷患送醫) 場景中，Nearest Car 與 MAPPO 的平均 AWT 與 ERT 看似非常接近，但細分四個 Priority 等級可以發現 MAPPO 優秀的資源傾斜機制：
@@ -76,16 +76,16 @@
 *   **單智能體 AI 的癱瘓**：相較之下，單智能體 MaskablePPO 在極端負載下，其 L0 (57.1s)、L1 (67.0s)、L2 (67.2s) 與 L3 (12.35s) 等候時間全面大幅惡化，驗證了在極端癱瘓的高負載下，單一 Agent 無法應對龐大的聯合狀態-動作空間，而 MAPPO 透過多智能體分布式決策與 Action Mask 阻斷機制，完美實現了輕重緩急調度。
 
 ### 4. 普通人 vs. 急診等待時間對比 (AWT vs. ERT)
-![Normal vs. Emergency WT](images/comparison_awt_20260606_223622.png)
+![Normal vs. Emergency WT](plots/comparison_awt_20260604_180531.png)
 
 ### 5. 乘客優先權等候時間分佈箱線圖
-![Priority Boxplot](images/comparison_priority_boxplot_20260606_223622.png)
+![Priority Boxplot](plots/comparison_priority_boxplot_20260604_180531.png)
 
 ### 6. MAPPO 訓練收斂曲線
-![Training Convergence](images/training_convergence_20260606_223622.png)
+![Training Convergence](plots/training_convergence_20260604_180531.png)
 
 ### 7. 多目標效能雷達圖
-![Radar Plot](images/comparison_radar_20260606_223622.png)
+![Radar Plot](plots/comparison_radar_20260604_180531.png)
 
 
 ## 四、 綠色節能性分析 (Green Energy & Mechanical Wear)
