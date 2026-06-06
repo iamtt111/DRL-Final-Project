@@ -1,6 +1,8 @@
 import argparse
 import time
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import pygame
 from src.envs.elevator_env import HospitalElevatorEnv
 from src.agents.ppo_agent import PPOAgent

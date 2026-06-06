@@ -17,7 +17,9 @@ dependencies = [
     "pyyaml",
     "pandas",
     "matplotlib",
-    "seaborn"
+    "seaborn",
+    "customtkinter",
+    "scipy"
 ]
 
 [tool.setuptools.packages.find]

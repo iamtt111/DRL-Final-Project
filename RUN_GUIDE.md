@@ -1,131 +1,115 @@
-# 🏥 智慧醫院電梯群控與優先調度系統 (Hospital EGCS) - 運行指引文件
+# 🏥 智慧醫院電梯群控系統 (EGCS) 執行與操作指南
 
-本指引文件旨在幫助團隊成員與評審快速設定環境、運行本專案的互動式模擬器（GUI Demo）、訓練強化學習模型，以及重現學術評估報告與圖表。
-
----
-
-## 📌 專案主要特性
-1. **多部電梯群控**：模擬 4 部電梯、16 層樓的醫院大樓環境。
-2. **四類乘客優先權級（Priority L0-L3）**：包含普通乘客 (L0)、輪椅患者 (L1)、醫護人員 (L2)、急診病床 (L3)。
-3. **四種調度演算法支援**：
-   * 傳統工業規則：**Nearest Car (最近車輛優先)**
-   * 經典表格式 RL：**SARSA(λ)**
-   * 單智能體深度 RL：**MaskablePPO**
-   * 多智能體深度 RL（本專案終極方案）：**MAPPO**
-4. **CustomTkinter 實時互動視覺化模擬器**：支援即時切換演算法、調整乘客生成速度、自訂極端情境（如早高峰、晚高峰、災難危機等）、以及區分緊急程度的實時日誌系統。
+本指南旨在引導團隊成員與評鑑委員快速配置環境，並運行本專案的核心展示面板、物理渲染模擬器以及學術成果重製腳本。
 
 ---
 
-## ⚙️ 環境配置與安裝
+## ⚙️ 一、 環境快速建置 (Environment Setup)
 
-建議使用 **Python 3.10** 的環境（專案已在此版本進行完整測試）。
+### 1. 系統需求
+*   **Python 版本**：`>= 3.10` (推薦 `3.10.x` 或 `3.11.x`)
+*   **作業系統**：Windows / macOS / Linux (GUI 部分支援各平台雙擊與視窗自適應)
 
-### 1. 建立並啟動虛擬環境 (以 Windows PowerShell 為例)
-```powershell
-# 建立虛擬環境
+### 2. 套件安裝步驟
+在專案根目錄下，開啟終端機並執行以下指令：
+
+```bash
+# 1. 建立虛擬環境 (選用，但強烈建議)
 python -m venv venv
+source venv/bin/activate       # macOS/Linux
+# Windows 系統請執行下行：
+# venv\Scripts\activate
 
-# 啟動虛擬環境
-.\venv\Scripts\Activate.ps1
-```
-
-### 2. 安裝相依套件與本機開發模式
-```powershell
-# 升級 pip
-python -m pip install --upgrade pip
-
-# 安裝基本依賴套件
+# 2. 安裝所有核心與 GUI 相依套件 (包含 stable-baselines3, customtkinter, pygame, scipy 等)
 pip install -r requirements.txt
 
-# 以開發者編輯模式安裝本專案套件 (這步會註冊 elevator_egcs 模組)
+# 3. 以開發者模式安裝本專案結構
 pip install -e .
 ```
 
 ---
 
-## 🖥️ 互動式 GUI 模擬 Demo 運行指引
+## 🎮 二、 兩種視覺化展示模式 (Visualizations)
 
-我們移除了舊版不穩定且會頻繁閃爍更新的 Streamlit 介面，改用 **CustomTkinter** 打造了高質感的桌面應用程式，以便於進行 Demo 展示。
+本專案提供兩個維度的視覺化展示：**CustomTkinter 全能主控台**（推薦，功能最完整）與 **Pygame 物理模擬器**。
 
-### 1. 啟動指令
-```powershell
-python scripts/demo_app.py
-```
+### Mode A: CustomTkinter 互動式主控面板 (強烈推薦 ✨)
+這是專門為 Demo 與實時觀察演算法決策設計的現代化 Dashboard。介面支援自適應縮放，徹底解決部分螢幕顯示不全或閃爍的問題。
 
-### 2. GUI 介面功能與操作說明
-* **左側電梯動畫展示區**：即時動態呈現 4 部電梯的樓層位置、上下行狀態、開關門狀態，以及電梯內部的載客優先權人數。
-* **左下方候梯隊伍**：動態展示各樓層大廳在電梯外排隊等待的乘客。
-  * 乘客外觀顏色與其優先級對應：**藍色 (普通人 L0)**、**黃色 (輪椅 L1)**、**綠色 (醫生 L2)**、**紅色 (急診 L3)**。
-* **右側演算法切換與控制面板**：
-  * **演算法下拉選單**：支援即時在 `Nearest Car`、`SARSA(λ)`、`MaskablePPO`、`MAPPO` 之間切換。
-  * **情境設定下拉選單**：可即時切換為 `Morning Peak (早高峰)`、`Evening Peak (晚高峰)`、`Mixed Traffic (混合流量)`、`Disaster Crisis (災難危機)`，觀察電梯在不同高負載交通流下的調度策略。
-  * **模擬控制按鈕**：提供「開始」、「暫停」、「重置」功能。
-  * **乘客生成率滑桿 (Traffic Rate)**：可即時調整新乘客的出現頻率（每分鐘生成人數）。
-  * **時間膨脹滑桿 (Time Scale)**：可調整模擬的加速倍率，方便快速觀測長時間的系統表現。
-* **右下方實時調度日誌 (Live Log)**：
-  * 即時顯示系統的調度日誌（包含新乘客到達、電梯指派、乘客上梯/到達等事件）。
-  * **自動區分緊急程度**：針對急診 (L3 Emergency) 的事件，會以 **[EMERGENCY] 加上醒目的紅色粗體** 顯示，幫助教授一眼看出 AI 正在對急診任務實施優先資源傾斜。
-* **視窗大小自我調整**：視窗已針對筆記型電腦與實驗室螢幕進行適配最佳化，所有內容均能清晰呈現，不會被遮擋。
+*   **啟動指令**：
+    ```bash
+    python scripts/demo_app.py
+    ```
+
+*   **核心功能與操作指引**：
+    1.  **切換演算法 (🤖 Agent)**：在左側選單中，可即時切換 **MAPPO (嵌入+冷啟動版)**、**MaskablePPO**、**SARSA(λ)** 或 **Nearest Car (規則式)**。
+    2.  **切換交通流情境 (📊 Scenario)**：支援 `morning_peak` (上班尖峰)、`evening_peak` (下班尖峰)、`mixed_traffic` (混合流量) 與 `disaster_crisis` (災難危機極端流量)。
+    3.  **速度調整 (⏱️ Speed)**：透過滑桿可即時調節電梯物理運行的刷新速度。
+    4.  **急診事件手動注入 (🚨 Emergency Button)**：在模擬中點擊「**🚨 注入 Level 3 急診**」按鈕，會在隨機樓層生成一個急診患者（去 1 樓手術室），您可即時在右側的**實時日誌**與電梯動畫中觀察 MAPPO 如何進行「任務搶占」與「減少停靠直達」。
+    5.  **日誌分級過濾 (📝 Real-time Log)**：日誌會以顏色區分重要性（紅色：急診 L3 | 黃色：醫護人員 L2 | 藍色：輪椅 L1），並提供過濾核取方塊，可方便追蹤急診進度。
 
 ---
 
-## 🏋️ 強化學習模型訓練指引
+### Mode B: Pygame 物理模擬器 (經典渲染 👾)
+展示原始的 2D 物理運行，適合用來觀察電梯加速度、開關門機制以及乘客在樓層外排隊等候的即時變化。
 
-若您需要重新訓練模型或調整獎勵函數，請使用以下腳本。
+*   **啟動指令**：
+    ```bash
+    # 執行 MAPPO 演算法 (帶 Pygame 渲染)
+    python scripts/demo.py --agent mappo --scenario morning_peak
 
-### 1. 訓練多智能體 MAPPO 模型 (本專案核心)
-```powershell
-python -m scripts.train_mappo --timesteps 1500000
-```
-* 訓練完成後的模型與最佳檢查點 (Best Model) 將會自動保存在 `models/mappo/` 目錄中。
-* 設定參數如網絡結構、學習率等可參考 `configs/mappo.yaml`。
-
-### 2. 訓練單智能體 PPO (MaskablePPO) 模型
-```powershell
-python scripts/train.py --config configs/train_ppo.yaml
-```
-* 模型將保存在 `models/ppo/` 目錄下。
-
-### 3. 訓練經典 SARSA(λ) 模型
-```powershell
-python scripts/train_sarsa.py
-```
-* 權重將保存在 `models/sarsa/sarsa_weights.npz`。
+    # 執行 Nearest Car 傳統規則演算法
+    python scripts/demo.py --agent rule --scenario morning_peak
+    ```
+*   **參數說明**：
+    *   `--agent` 可選：`mappo`, `ppo`, `sarsa`, `rule`
+    *   `--scenario` 可選：`morning_peak`, `evening_peak`, `mixed_traffic`
 
 ---
 
-## 📊 基準演算法比較與評估報告生成
+## 📊 三、 學術圖表與評估報告重製 (Academic Benchmarks)
 
-為保障學術評估的嚴謹性，本專案提供了一鍵運行基準測試與學術圖表重現的方案。
+為了確保學術嚴謹度，我們已在先前完成了 100 Episodes 的蒙地卡羅基準測試，並將詳細數據保存在 `docs/benchmark_results.json` 中。您可以免去漫長的模擬運行，直接一鍵重繪論文規格的七張學術圖表並重寫評估報告。
 
-### 1. 運行 100 Episodes 基準測試模擬 (耗時較長)
-```powershell
-python -m scripts.compare_baselines --episodes 100
-```
-* 該腳本會在四個交通流情境下，對四種演算法各進行 100 個 Episode 的靜默模擬測試。
-* 測試結束後，會將詳細的所有乘客乘梯歷程與時間數據寫入至 `docs/benchmark_results.json`，並在終端機輸出 AWT 與 ERT 的獨立樣本雙尾 t 檢定 (Welch's t-test) p-value 顯著性結果。
+*   **一鍵重製指令**：
+    ```bash
+    python scripts/regenerate_report.py
+    ```
 
-### 2. 重現學術評估報告與 4 色分析圖表 (推薦，使用已有數據一鍵生成)
-如果您不需要重新運行漫長的模擬，可以直接使用專案中已保存的 `docs/benchmark_results.json` (包含 100 episodes 的完整記錄)，來重新渲染所有論文圖表並更新評估報告：
-```powershell
-python scripts/regenerate_report.py
-```
-* **產出物 1 (圖表)**：自動於 `docs/images/` 目錄中生成以下 4 色演算法對比圖：
-  * `comparison_tradeoff_*.png`：AWT vs ERT 的多目標決策 **Pareto 邊界分析散點圖**。
-  * `comparison_cdf_*.png`：急診等待時間的**累積機率分佈 (CDF) 圖**，包含 95% 安全響應對齊線與 10s/15s 關鍵閾值。
-  * `comparison_disaster_*.png`：災難情境下，按 Priority (L0-L3) 分級的 **95% 最壞等候時間與平均等候時間對比箱線圖**。
-  * `comparison_awt_*.png`：AWT 分組條形圖（附帶獨立 t 檢定 p-value 顯著性對比括號與星號標註）。
-  * `comparison_priority_boxplot.png`：乘客優先權等候時間分佈箱線圖。
-  * `comparison_radar.png`：多目標效能綜合雷達圖。
-  * `training_convergence.png`：訓練收斂曲線圖。
-* **產出物 2 (報告)**：更新 **`docs/evaluation_report.md`** 評估報告，包含最新的 4 欄情境指標對比表格及深入的學術深度分析。
+*   **執行後成果**：
+    1.  會自動讀取 100 回合原始數據，將 **MAPPO**、**MaskablePPO**、**SARSA(λ)** 與 **Nearest Car** 四種演算法進行橫向統計對比。
+    2.  在 `docs/images/` 目錄下重新渲染並存檔以下七張高清學術圖表：
+        *   `comparison_tradeoff_*.png` (AWT vs. ERT 的 Pareto Frontier 雙標權衡圖)
+        *   `comparison_cdf_*.png` (急診等待時間的累積機率 CDF 分佈圖)
+        *   `comparison_disaster_*.png` (災難極端高負載分級箱線圖)
+        *   `comparison_awt_*.png` (普通 vs. 急診等待時間對比長條圖，附 Welch's t-test 顯著性標註)
+        *   `comparison_priority_boxplot.png` (優先級等待分布箱線圖)
+        *   `comparison_radar.png` (多目標綜合雷達圖)
+        *   `training_convergence.png` (強化學習訓練收斂曲線)
+    3.  自動重寫 `docs/evaluation_report.md` 為最新的繁體中文版學術評估報告，並帶有 4 欄數據對比表與最新的學術圖片路徑。
 
 ---
 
-## 🧹 專案結構說明
-* `src/envs/`：HospitalEGCS 醫院電梯 Gymnasium 模擬環境。
-* `src/agents/`：四種調度策略 Agent 的實作代碼。
-* `src/visualization/`：Pygame 渲染器與 Matplotlib 圖表繪製模組。
-* `configs/`：YAML 模型設定檔。
-* `models/`：存放訓練完成的模型。
-* `docs/`：包含 PDF 參考論文、對照結果 json、與繁體中文學術評估報告。
+## 💾 四、 GitHub 分支提交與上傳指引 (Git Push)
+
+若要將您當前的本地開發成果提交並推送到 GitHub 的 `zhen` 分支，可參考以下 Git 標準工作流：
+
+```bash
+# 1. 確保目前在 zhen 分支 (若不存在則建立)
+git checkout -b zhen
+
+# 2. 檢查變動的檔案狀態
+git status
+
+# 3. 將所有變更加入暫存區
+git add .
+
+# 4. 提交變更並撰寫訊息
+git commit -m "feat: update EGCS 4-algorithm baseline evaluation and customtkinter dashboard"
+
+# 5. 推送至遠端 GitHub zhen 分支
+git push origin zhen
+```
+
+---
+💡 **溫馨提示**：如果其他同學在執行 `python scripts/demo_app.py` 時遇到字型警告或畫面缺少元件，請確保已完整執行 `pip install -r requirements.txt`。如有任何技術疑問，歡迎參考 [OpenSpec.md](OpenSpec.md) 規格文件。

@@ -1,4 +1,6 @@
 import os
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import argparse
 import numpy as np
 from src.envs.elevator_env import HospitalElevatorEnv

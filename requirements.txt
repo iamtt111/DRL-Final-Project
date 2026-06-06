@@ -8,3 +8,5 @@ pytest>=7.0.0
 pandas
 matplotlib
 seaborn
+customtkinter
+scipy
