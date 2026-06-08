@@ -67,11 +67,11 @@ class Elevator:
 
     @property
     def current_load(self) -> int:
-        return len(self.passengers)
+        return sum(p.space_occupied for p in self.passengers)
 
     @property
     def load_ratio(self) -> float:
-        return len(self.passengers) / self.max_capacity
+        return self.current_load / self.max_capacity
 
     @property
     def is_door_open(self) -> bool:

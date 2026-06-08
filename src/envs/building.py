@@ -186,7 +186,7 @@ class Building:
                 # (c) 乘客上電梯 (Boarding)
                 boarding_passengers = []
                 for p in list(floor.waiting_queue):
-                    if len(elev.passengers) >= elev.max_capacity:
+                    if elev.current_load + p.space_occupied > elev.max_capacity:
                         break
                     
                     # 如果電梯有優先搶佔目標，非該目標樓層或非 Level 3 緊急乘客禁止上車

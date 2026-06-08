@@ -7,6 +7,7 @@ import customtkinter as ctk
 import numpy as np
 import torch
 import yaml
+import json
 
 from src.envs.elevator_env import HospitalElevatorEnv
 from src.envs.elevator_ma_env import HospitalElevatorMAEnv
@@ -50,6 +51,7 @@ class ElevatorApp(ctk.CTk):
 
         # 模擬狀態變數
         self.running = False
+        self.paused = False
         self.env = None
         self.agent = None
         self.passengers_delivered = []
@@ -65,7 +67,7 @@ class ElevatorApp(ctk.CTk):
         # 1. 建立左側控制面板 (Sidebar)
         self.sidebar_frame = ctk.CTkFrame(self, corner_radius=0, width=280)
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
-        self.sidebar_frame.grid_rowconfigure(9, weight=1)
+        self.sidebar_frame.grid_rowconfigure(11, weight=1)
 
         # 側邊欄標題
         self.title_label = ctk.CTkLabel(self.sidebar_frame, text="🏥 Hospital EGCS", font=ctk.CTkFont(size=22, weight="bold"))
@@ -78,7 +80,8 @@ class ElevatorApp(ctk.CTk):
         self.agent_label.grid(row=2, column=0, padx=20, pady=(10, 5), sticky="w")
         self.agent_dropdown = ctk.CTkOptionMenu(
             self.sidebar_frame,
-            values=["MAPPO (嵌入+冷啟動版)", "MaskablePPO", "SARSA(λ)", "Nearest Car (規則式)"]
+            values=["MAPPO (嵌入+冷啟動版)", "MaskablePPO", "SARSA(λ)", "Nearest Car (規則式)"],
+            command=self.update_benchmark_kpis
         )
         self.agent_dropdown.grid(row=3, column=0, padx=20, pady=5, sticky="ew")
 
@@ -87,7 +90,8 @@ class ElevatorApp(ctk.CTk):
         self.scenario_label.grid(row=4, column=0, padx=20, pady=(15, 5), sticky="w")
         self.scenario_dropdown = ctk.CTkOptionMenu(
             self.sidebar_frame,
-            values=["morning_peak", "evening_peak", "mixed_traffic", "disaster_crisis"]
+            values=["morning_peak", "evening_peak", "mixed_traffic", "disaster_crisis"],
+            command=self.update_benchmark_kpis
         )
         self.scenario_dropdown.grid(row=5, column=0, padx=20, pady=5, sticky="ew")
 
@@ -98,12 +102,33 @@ class ElevatorApp(ctk.CTk):
         self.speed_slider.set(0.05)
         self.speed_slider.grid(row=7, column=0, padx=20, pady=5, sticky="ew")
         
+        # 隨機客流控制區塊
+        self.seed_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
+        self.seed_frame.grid(row=8, column=0, padx=20, pady=(15, 5), sticky="ew")
+        self.seed_frame.grid_columnconfigure(0, weight=1)
+        self.seed_frame.grid_columnconfigure(1, weight=0)
+        self.seed_frame.grid_columnconfigure(2, weight=0)
+        
+        self.seed_entry_label = ctk.CTkLabel(self.seed_frame, text="🎲 Seed:", anchor="w")
+        self.seed_entry_label.grid(row=0, column=0, sticky="w")
+        
+        self.seed_entry = ctk.CTkEntry(self.seed_frame, width=55)
+        self.seed_entry.insert(0, "42")
+        self.seed_entry.grid(row=0, column=1, padx=2, sticky="e")
+        
+        self.random_seed_btn = ctk.CTkButton(self.seed_frame, text="🎲 隨機", width=45, command=self.generate_random_seed_in_entry)
+        self.random_seed_btn.grid(row=0, column=2, padx=2, sticky="e")
+        
         # 按鈕
         self.start_btn = ctk.CTkButton(self.sidebar_frame, text="▶️ 開始模擬", command=self.start_simulation, fg_color="#2ecc71", hover_color="#27ae60", text_color="white")
-        self.start_btn.grid(row=8, column=0, padx=20, pady=(30, 10), sticky="ew")
+        self.start_btn.grid(row=9, column=0, padx=20, pady=(20, 10), sticky="ew")
+        
+        self.pause_btn = ctk.CTkButton(self.sidebar_frame, text="⏸️ 暫停", command=self.pause_simulation, fg_color="#f39c12", hover_color="#d35400", text_color="white")
+        self.pause_btn.grid(row=10, column=0, padx=20, pady=10, sticky="ew")
+        self.pause_btn.configure(state="disabled")
         
         self.stop_btn = ctk.CTkButton(self.sidebar_frame, text="⏹️ 停止", command=self.stop_simulation, fg_color="#e74c3c", hover_color="#c0392b", text_color="white")
-        self.stop_btn.grid(row=9, column=0, padx=20, pady=10, sticky="ew")
+        self.stop_btn.grid(row=11, column=0, padx=20, pady=10, sticky="ew")
         self.stop_btn.configure(state="disabled")
 
         # 2. 建立右側主面板 (Main Panel)
@@ -120,21 +145,31 @@ class ElevatorApp(ctk.CTk):
             self.kpi_frame.grid_columnconfigure(i, weight=1, uniform="kpi")
 
         self.kpi_cards = []
+        self.bench_labels = []
         kpi_titles = ["⏳ 模擬時間", "👥 AWT (全體等候)", "🚑 ERT (急診等候)", "🎯 ECR (急診完成率)", "⚡ NSS (總起停次數)"]
         kpi_colors = ["#2c3e50", "#2980b9", "#c0392b", "#d35400", "#27ae60"]
 
         for i, (title, color) in enumerate(zip(kpi_titles, kpi_colors)):
-            card = ctk.CTkFrame(self.kpi_frame, border_width=1.5, border_color=color, height=85)
+            card = ctk.CTkFrame(self.kpi_frame, border_width=1.5, border_color=color, height=95)
             card.grid(row=0, column=i, padx=5, sticky="ew")
             card.grid_propagate(False)
             
             title_lbl = ctk.CTkLabel(card, text=title, font=ctk.CTkFont(size=12, weight="bold"), text_color="#a0a0a0")
             title_lbl.pack(anchor="w", padx=10, pady=(5, 0))
             
-            val_lbl = ctk.CTkLabel(card, text="--", font=ctk.CTkFont(size=20, weight="bold"), text_color=color)
-            val_lbl.pack(anchor="w", padx=10, pady=(2, 5))
+            if i == 0:
+                val_lbl = ctk.CTkLabel(card, text="0 秒", font=ctk.CTkFont(size=18, weight="bold"), text_color=color)
+                val_lbl.pack(anchor="w", padx=10, pady=(2, 0))
+                bench_lbl = ctk.CTkLabel(card, text="單次運行", font=ctk.CTkFont(size=11), text_color="#888888")
+                bench_lbl.pack(anchor="w", padx=10, pady=(1, 5))
+            else:
+                val_lbl = ctk.CTkLabel(card, text="--", font=ctk.CTkFont(size=18, weight="bold"), text_color=color)
+                val_lbl.pack(anchor="w", padx=10, pady=(2, 0))
+                bench_lbl = ctk.CTkLabel(card, text="此輪運行: --", font=ctk.CTkFont(size=11), text_color="#888888")
+                bench_lbl.pack(anchor="w", padx=10, pady=(1, 5))
             
             self.kpi_cards.append(val_lbl)
+            self.bench_labels.append(bench_lbl)
 
         # 2b. 下半部：大樓視覺化與終端日誌
         self.display_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
@@ -170,11 +205,16 @@ class ElevatorApp(ctk.CTk):
         self.log_textbox.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
         self.log_textbox.configure(state="disabled")
 
-        # 初始化日誌 Tag 樣式
-        self.log_textbox.tag_config("normal", foreground="#3498db")          # 寶藍色 (一般調度)
-        self.log_textbox.tag_config("success", foreground="#2ecc71")         # 綠色 (完成送達)
-        self.log_textbox.tag_config("emergency", foreground="#e74c3c")        # 亮紅色 (急診搶佔)
-        self.log_textbox.tag_config("info", foreground="#a0a0a0")            # 灰色 (系統訊息)
+        # 初始化日誌 Tag 樣式 (依乘客優先級別著色)
+        self.log_textbox.tag_config("l3_emergency", foreground="#eb3b5a")     # 鮮紅色 (急診)
+        self.log_textbox.tag_config("l2_staff", foreground="#fa8231")         # 橘黃色 (醫護)
+        self.log_textbox.tag_config("l1_wheelchair", foreground="#3498db")    # 寶藍色 (輪椅)
+        self.log_textbox.tag_config("l0_normal", foreground="#a0a0a0")        # 灰色 (普通乘客 / 指派)
+        self.log_textbox.tag_config("info", foreground="#666666")             # 暗灰色 (系統訊息)
+
+        # 載入基準測試數據與初始化基準標籤
+        self.benchmark_data = self.load_benchmark_data()
+        self.update_benchmark_kpis()
 
         # 第一次靜態繪製 Canvas 背景
         self.bind("<Configure>", lambda e: self.draw_static_building_background())
@@ -191,7 +231,7 @@ class ElevatorApp(ctk.CTk):
             w, h = 500, 600
 
         margin_left = 60
-        margin_right = 160
+        margin_right = 110
         margin_top = 40
         margin_bottom = 40
         floor_height = (h - margin_top - margin_bottom) / 16.0
@@ -210,18 +250,20 @@ class ElevatorApp(ctk.CTk):
             self.canvas.create_text(x_center, h - margin_bottom + 18, text=f"E{i}", fill="#555555", font=("Arial", 10, "bold"))
 
     def add_log(self, text):
-        """新增一條日誌並自動滾動 (支援按重要程度著色)"""
+        """新增一條日誌並自動滾動 (支援按重要程度與乘客優先權著色)"""
         self.log_textbox.configure(state="normal")
         
         # 根據日誌內容決定標籤顏色
-        if "🚨" in text or "急診" in text or "強佔" in text or "搶佔" in text:
-            tag = "emergency"
-        elif "✅" in text or "送達" in text:
-            tag = "success"
-        elif "📢" in text or "🚀" in text or "⏹️" in text:
-            tag = "info"
+        if "🚨" in text or "急診" in text or "強佔" in text:
+            tag = "l3_emergency"
+        elif "👨‍⚕️" in text or "醫護" in text:
+            tag = "l2_staff"
+        elif "♿" in text or "輪椅" in text:
+            tag = "l1_wheelchair"
+        elif "普通" in text or "外呼指派" in text or "任務分配" in text or "✅" in text:
+            tag = "l0_normal"
         else:
-            tag = "normal"
+            tag = "info"
             
         self.log_textbox.insert("end", text + "\n", tag)
         self.log_textbox.see("end")
@@ -239,10 +281,14 @@ class ElevatorApp(ctk.CTk):
             return
 
         self.running = True
+        self.paused = False
         self.start_btn.configure(state="disabled")
+        self.pause_btn.configure(state="normal", text="⏸️ 暫停")
         self.stop_btn.configure(state="normal")
         self.agent_dropdown.configure(state="disabled")
         self.scenario_dropdown.configure(state="disabled")
+        self.seed_entry.configure(state="disabled")
+        self.random_seed_btn.configure(state="disabled")
 
         self.clear_logs()
         self.add_log("📢 正在初始化環境配置...")
@@ -262,9 +308,17 @@ class ElevatorApp(ctk.CTk):
         else:
             self.add_log("⚠️ 找不到情境設定檔，使用環境預設交通流。")
 
+        # 決定客流隨機編號
+        try:
+            seed = int(self.seed_entry.get())
+        except ValueError:
+            seed = 42
+            self.add_log("⚠️ 客流編號格式錯誤，使用預設編號 42")
+        self.add_log(f"🎲 使用模擬客流編號 (Seed)：{seed}")
+
         # 建立環境
         self.env = HospitalElevatorEnv(config=config)
-        self.env.reset(seed=42)
+        self.env.reset(seed=seed)
 
         # 初始化 Agent
         selected_agent = self.agent_dropdown.get()
@@ -291,6 +345,11 @@ class ElevatorApp(ctk.CTk):
 
         self.passengers_delivered = []
         self.elevator_starts = [0] * self.env.num_elevators
+
+        # 重設頂部 KPI 實時數值
+        self.kpi_cards[0].configure(text="0 秒")
+        for i in range(1, 5):
+            self.bench_labels[i].configure(text="此輪運行: --")
 
         # 預熱模擬機制：預先在背景快速運行 120 秒建立初始客流與電梯狀態
         warmup_time = 120
@@ -343,19 +402,23 @@ class ElevatorApp(ctk.CTk):
     def stop_simulation(self):
         """點擊停止，停止時鐘"""
         self.running = False
+        self.paused = False
         if self.loop_timer_id is not None:
             self.after_cancel(self.loop_timer_id)
             self.loop_timer_id = None
         
         self.start_btn.configure(state="normal")
+        self.pause_btn.configure(state="disabled", text="⏸️ 暫停")
         self.stop_btn.configure(state="disabled")
         self.agent_dropdown.configure(state="normal")
         self.scenario_dropdown.configure(state="normal")
+        self.seed_entry.configure(state="normal")
+        self.random_seed_btn.configure(state="normal")
         self.add_log("⏹️ 模擬已被使用者強制停止。")
 
     def simulation_step(self):
         """核心物理模擬與調度遞迴時鐘"""
-        if not self.running:
+        if not self.running or self.paused:
             return
 
         env = self.env
@@ -381,7 +444,8 @@ class ElevatorApp(ctk.CTk):
             call_pop = env.pending_assignments.pop(0)
             env.building.elevators[action].assign_hall_call(call_pop.floor, call_pop.direction)
             
-            action_desc = f"⏱️ {int(env.building.current_time)}s: 指派 {call_pop.floor + 1}F {'▲' if call_pop.direction == 1 else '▼'} 呼叫 ➡️ 電梯 {action}"
+            direction_str = "向上" if call_pop.direction == 1 else "向下"
+            action_desc = f"⏱️ 模擬 {int(env.building.current_time)}秒：【外呼指派】將 {call_pop.floor + 1}樓 {direction_str} 的等候呼叫 ➡️ 分配給【電梯 {action}】"
             self.add_log(action_desc)
 
         # (b) 推進物理時間 1 秒
@@ -391,7 +455,7 @@ class ElevatorApp(ctk.CTk):
         for p in new_passengers:
             if p.priority_level == 3:
                 env.priority_system.check_and_apply_preemption(env.building, p.origin_floor)
-                self.add_log(f"🚨 偵測到 {p.origin_floor + 1}F 急診呼叫，啟動強佔！")
+                self.add_log(f"🚨 【緊急強佔】偵測到 {p.origin_floor + 1}樓 有急診呼叫！系統立即啟動強佔，命令最近電梯火速前往！")
             env.building.add_passenger(p)
             
         events = env.building.update(env.dt)
@@ -410,8 +474,8 @@ class ElevatorApp(ctk.CTk):
                     "priority": p_level
                 })
                 
-                p_names = {0: "普通", 1: "輪椅", 2: "醫護", 3: "🚨急診"}
-                log_p = f"✅ 送達 {p_names.get(p_level, '普通')} 乘客 (等候: {wait_t:.1f}s) ➡️ 電梯 {elev_id}"
+                p_names = {0: "普通", 1: "♿輪椅", 2: "👨‍⚕️醫護", 3: "🚨急診"}
+                log_p = f"✅ 【載客送達】電梯 {elev_id} 成功送達一員【{p_names.get(p_level, '普通')}】乘客（該乘客等候時間：{wait_t:.1f} 秒）"
                 self.add_log(log_p)
                 
             elif event.type.value == "elevator_arrived":
@@ -426,10 +490,14 @@ class ElevatorApp(ctk.CTk):
         if env.building.current_time >= env.max_time:
             self.add_log("🎉 模擬已完成 10 分鐘 Episode 結束。")
             self.running = False
+            self.paused = False
             self.start_btn.configure(state="normal")
+            self.pause_btn.configure(state="disabled", text="⏸️ 暫停")
             self.stop_btn.configure(state="disabled")
             self.agent_dropdown.configure(state="normal")
             self.scenario_dropdown.configure(state="normal")
+            self.seed_entry.configure(state="normal")
+            self.random_seed_btn.configure(state="normal")
             return
 
         # 繼續下一個時間步
@@ -446,7 +514,7 @@ class ElevatorApp(ctk.CTk):
             w, h = 500, 600
 
         margin_left = 60
-        margin_right = 160
+        margin_right = 110
         margin_top = 40
         margin_bottom = 40
         floor_height = (h - margin_top - margin_bottom) / 16.0
@@ -474,16 +542,19 @@ class ElevatorApp(ctk.CTk):
             waiting_passengers = [p for p in floor.waiting_queue if p.state == PassengerState.WAITING]
             
             # (a) 首先在最右側保留數字統計標籤，方便快速閱讀
-            normal_cnt = sum(1 for p in waiting_passengers if p.priority_level < 3)
-            emergency_cnt = sum(1 for p in waiting_passengers if p.priority_level == 3)
+            l0_cnt = sum(1 for p in waiting_passengers if p.priority_level == 0)
+            l1_cnt = sum(1 for p in waiting_passengers if p.priority_level == 1)
+            l2_cnt = sum(1 for p in waiting_passengers if p.priority_level == 2)
+            l3_cnt = sum(1 for p in waiting_passengers if p.priority_level == 3)
             x_text = w - margin_right + 15
             
             # (b) 在電梯右方到邊界之間，繪製與先前 pygame 一致的排隊乘客圖示 (60 FPS 平滑顯示)
             # 電梯3的中心為 margin_left + 40 + 3 * 70 = 270 (當 margin_left=60)
-            start_x = margin_left + 40 + 3 * 70 + 40
+            start_x = margin_left + 40 + 3 * 70 + 30
             space_available = w - margin_right - start_x - 10
-            max_passengers_to_show = 12
-            offset_x = max(8, min(14, space_available / max_passengers_to_show if space_available > 0 else 10))
+            max_passengers_to_show = 10
+            # 加大間距，使得圖示與文字更大時不會重疊
+            offset_x = max(18, min(26, space_available / max_passengers_to_show if space_available > 0 else 20))
 
             for idx, p in enumerate(waiting_passengers[:max_passengers_to_show]):
                 px = start_x + idx * offset_x
@@ -499,30 +570,52 @@ class ElevatorApp(ctk.CTk):
                 else:
                     color = "#a5b1c2"  # Level 0 普通：灰白色
                 
-                # 如果是急診乘客，繪製一個雙環脈動效果 (類似 pygame 的外發光圈)
+                # 如果是急診乘客，繪製一個雙環脈動效果 (大一點且外圈閃爍更清晰)
                 if p.priority_level == 3:
-                    pulse_radius = 8 + int(3 * np.sin(time.time() * 8)) # 使用系統時間模擬脈動
-                    self.canvas.create_oval(px - pulse_radius, py - pulse_radius, px + pulse_radius, py + pulse_radius, outline="#eb3b5a", width=1.5)
+                    pulse_radius = 12 + int(4 * np.sin(time.time() * 8)) # 使用系統時間模擬脈動
+                    self.canvas.create_oval(px - pulse_radius, py - pulse_radius, px + pulse_radius, py + pulse_radius, outline="#eb3b5a", width=2.0)
                 
-                # 繪製代表上行/下行方向的三角形
+                # 繪製更醒目、更大的代表上行/下行三角形 (大小由 14x14 加大為 16x16)
                 if p.direction == 1:
                     # 往上三角形
-                    self.canvas.create_polygon(px, py - 4, px - 4, py + 4, px + 4, py + 4, fill=color, outline="")
+                    self.canvas.create_polygon(px, py - 8, px - 8, py + 8, px + 8, py + 8, fill=color, outline="")
                 else:
                     # 往下三角形
-                    self.canvas.create_polygon(px, py + 4, px - 4, py - 4, px + 4, py - 4, fill=color, outline="")
+                    self.canvas.create_polygon(px, py + 8, px - 8, py - 8, px + 8, py - 8, fill=color, outline="")
 
-                # 在三角形上方繪製其目的地樓層數字 (如 Lobby 或 2-16)
+                # 在三角形上方繪製其目的地樓層數字 (字體大小由 9 加大為 10，更加清晰可讀)
                 dest_lbl = f"{p.destination_floor + 1}"
-                self.canvas.create_text(px, py - 9, text=dest_lbl, fill=color, font=("Arial", 7, "bold"))
+                self.canvas.create_text(px, py - 14, text=dest_lbl, fill=color, font=("Arial", 10, "bold"))
 
-            # 繪製統計數字標籤
-            if normal_cnt > 0 and emergency_cnt > 0:
-                self.canvas.create_text(x_text, y, text=f"👥{normal_cnt} 🚨{emergency_cnt}", fill="#eb3b5a", font=("Arial", 10, "bold"), anchor="w")
-            elif normal_cnt > 0:
-                self.canvas.create_text(x_text, y, text=f"👥{normal_cnt}", fill="#3867d6", font=("Arial", 10), anchor="w")
-            elif emergency_cnt > 0:
-                self.canvas.create_text(x_text, y, text=f"🚨{emergency_cnt}", fill="#eb3b5a", font=("Arial", 10, "bold"), anchor="w")
+            # 繪製統計數字標籤（包含四個優先級：👥普通, ♿輪椅, 👨‍⚕️醫護, 🚨急診）
+            text_parts = []
+            if l3_cnt > 0:
+                text_parts.append(f"🚨{l3_cnt}")
+            if l2_cnt > 0:
+                text_parts.append(f"👨‍⚕️{l2_cnt}")
+            if l1_cnt > 0:
+                text_parts.append(f"♿{l1_cnt}")
+            if l0_cnt > 0:
+                text_parts.append(f"👥{l0_cnt}")
+                
+            label_text = " ".join(text_parts)
+            
+            # 依據等候隊列中最高優先級決定標籤顏色與字型
+            if l3_cnt > 0:
+                text_color = "#eb3b5a"  # 鮮紅色 (急診)
+                text_font = ("Arial", 11, "bold")
+            elif l2_cnt > 0:
+                text_color = "#fa8231"  # 橘黃色 (醫護)
+                text_font = ("Arial", 11, "bold")
+            elif l1_cnt > 0:
+                text_color = "#3867d6"  # 亮藍色 (輪椅)
+                text_font = ("Arial", 11, "bold")
+            else:
+                text_color = "#a0a0a0"  # 灰色 (普通)
+                text_font = ("Arial", 11)
+                
+            if label_text:
+                self.canvas.create_text(x_text, y, text=label_text, fill=text_color, font=text_font, anchor="w")
 
         # 4. 繪製電梯實體
         for elev in self.env.building.elevators:
@@ -573,11 +666,93 @@ class ElevatorApp(ctk.CTk):
         nss = sum(self.elevator_starts)
 
         # 更新 UI
+        # 1. 模擬時間大字更新
         self.kpi_cards[0].configure(text=f"{int(self.env.building.current_time)} 秒")
-        self.kpi_cards[1].configure(text=f"{awt:.2f} 秒")
-        self.kpi_cards[2].configure(text=f"{ert:.2f} 秒")
-        self.kpi_cards[3].configure(text=f"{ecr:.2f} %")
-        self.kpi_cards[4].configure(text=f"{nss} 次")
+        # 2. 實時指標小字更新 (大字保持基準值不變)
+        self.bench_labels[1].configure(text=f"此輪運行: {awt:.2f} 秒")
+        self.bench_labels[2].configure(text=f"此輪運行: {ert:.2f} 秒")
+        self.bench_labels[3].configure(text=f"此輪運行: {ecr:.2f} %")
+        self.bench_labels[4].configure(text=f"此輪運行: {nss} 次")
+
+    def load_benchmark_data(self):
+        """讀取基準測試 JSON 資料"""
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        json_path = os.path.join(base_dir, "docs", "benchmark_results.json")
+        try:
+            if os.path.exists(json_path):
+                with open(json_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            else:
+                return None
+        except Exception as e:
+            print(f"Error loading benchmark results: {e}")
+            return None
+
+    def update_benchmark_kpis(self, *args):
+        """依據下拉選單更新頂部 KPI 卡片的基準測試平均值"""
+        if not self.benchmark_data:
+            for i in range(1, 5):
+                self.kpi_cards[i].configure(text="--")
+            return
+
+        selected_scenario = self.scenario_dropdown.get()
+        selected_agent = self.agent_dropdown.get()
+
+        # 對應的 JSON 鍵值
+        AGENT_MAPPING = {
+            "MAPPO (嵌入+冷啟動版)": "MAPPO",
+            "MaskablePPO": "MaskablePPO",
+            "SARSA(λ)": "SARSA(λ)",
+            "Nearest Car (規則式)": "Nearest Car"
+        }
+
+        agent_key = AGENT_MAPPING.get(selected_agent)
+        scenarios = self.benchmark_data.get("scenarios", {})
+        scenario_data = scenarios.get(selected_scenario, {})
+        agent_data = scenario_data.get(agent_key, {}) if scenario_data else {}
+
+        if agent_data:
+            awt = agent_data.get("awt", 0.0)
+            ert = agent_data.get("ert", 0.0)
+            ecr = agent_data.get("ecr", 0.0)
+            nss = agent_data.get("nss", 0.0)
+
+            # 更新基準大字 (kpi_cards 包含 5 個，第 0 個是時間)
+            self.kpi_cards[1].configure(text=f"{awt:.2f} 秒")
+            self.kpi_cards[2].configure(text=f"{ert:.2f} 秒")
+            self.kpi_cards[3].configure(text=f"{ecr:.2f} %")
+            self.kpi_cards[4].configure(text=f"{nss:.2f} 次")
+        else:
+            for i in range(1, 5):
+                self.kpi_cards[i].configure(text="--")
+
+        # 同步重設「此輪運行」的小字為未開始狀態
+        for i in range(1, 5):
+            self.bench_labels[i].configure(text="此輪運行: --")
+
+    def generate_random_seed_in_entry(self):
+        """隨機產生一個模擬客流編號並寫入輸入框"""
+        random_seed = int(np.random.randint(0, 100000))
+        self.seed_entry.delete(0, "end")
+        self.seed_entry.insert(0, str(random_seed))
+
+    def pause_simulation(self):
+        """切換暫停/繼續狀態"""
+        if not self.running:
+            return
+        
+        self.paused = not self.paused
+        if self.paused:
+            self.pause_btn.configure(text="▶️ 繼續")
+            self.add_log("⏸️ 模擬已暫停。")
+            if self.loop_timer_id is not None:
+                self.after_cancel(self.loop_timer_id)
+                self.loop_timer_id = None
+        else:
+            self.pause_btn.configure(text="⏸️ 暫停")
+            self.add_log("▶️ 模擬繼續運行。")
+            # 重新啟動時鐘
+            self.simulation_step()
 
 if __name__ == "__main__":
     app = ElevatorApp()

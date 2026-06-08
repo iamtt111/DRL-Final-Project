@@ -36,3 +36,11 @@ class Passenger:
     def direction(self) -> int:
         """移動方向: +1 上行, -1 下行"""
         return 1 if self.destination_floor > self.origin_floor else -1
+
+    @property
+    def space_occupied(self) -> int:
+        """此優先權乘客所佔用的電梯空間容量 (單位)"""
+        if self.priority_level == 1:       # ♿輪椅族：佔 2 人空間
+            return 2
+        else:                              # 👥普通 / 醫護 / 急診：佔 1 人空間
+            return 1
